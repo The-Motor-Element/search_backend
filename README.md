@@ -1,6 +1,19 @@
 # Apollo Tire Search Backend
 
-A production-ready search microservice built with [Meilisearch](https://www.meilisearch.com/) and [FastAPI](https://fastapi.tiangolo.com/) specifically designed for Apollo tire catalog data. This service provides powerful tire search capabilities with filters, pagination, sorting, and automotive-specific configuration options.
+**🚀 Production-ready search microservice with advanced Meilisearch features**
+
+Built with [Meilisearch](https://www.meilisearch.com/) and [FastAPI](https://fastapi.tiangolo.com/) specifically for Apollo tire catalog data with comprehensive search capabilities including faceted search, intelligent filtering, autocomplete, and analytics.
+
+## ✨ Key Highlights
+
+- 🔍 **1,557 Apollo Tire Products** - Fully indexed and searchable
+- ⚡ **Sub-millisecond Search** - Optimized Meilisearch performance  
+- 🎯 **Tire-Specific Features** - Ply ratings, sizes, patterns, groups
+- 📊 **Faceted Search & Analytics** - Real-time facet distributions
+- 💡 **Intelligent Autocomplete** - Context-aware suggestions
+- 🔗 **Similar Products** - AI-powered recommendations
+- ✨ **Advanced Filtering** - Boolean AND/OR/NOT with sorting
+- 📈 **Browse Mode & Analytics** - Category exploration and statistics
 
 ## Features
 
@@ -12,6 +25,33 @@ A production-ready search microservice built with [Meilisearch](https://www.meil
 - **Async Performance**: Built on async/await for high concurrency
 
 ## Quick Start
+
+### Option 1: Docker Deployment (Recommended)
+
+The fastest way to get the complete application running:
+
+```bash
+# Clone and navigate to the repository
+git clone <repository-url>
+cd search_backend
+
+# Deploy with Docker (includes UI + API + Meilisearch)
+chmod +x deploy.sh
+./deploy.sh
+
+# Wait for services to start, then load data
+docker-compose exec api python scripts/docker_load_data.py
+
+# Open the search interface
+open http://localhost:8080
+```
+
+**Service URLs:**
+- 🔍 **Search UI**: http://localhost:8080
+- 🔌 **API Documentation**: http://localhost:8001/docs  
+- 📊 **Meilisearch**: http://localhost:7700
+
+### Option 2: Local Development
 
 ### Prerequisites
 
@@ -98,19 +138,85 @@ curl -X POST "http://localhost:8000/index/settings" \
   }'
 ```
 
-### Search Apollo Tires
+## ✨ Advanced Features
+
+This Apollo tire search backend implements comprehensive Meilisearch features:
+
+### 🔍 Faceted Search & Analytics
 ```bash
-# Search by pattern/brand
-curl "http://localhost:8001/search/products?q=LOADSTAR"
+# Get search results with facet distribution for building filter UIs
+curl "http://localhost:8001/search/facets?q=LOADSTAR&facets=group,ply_rating,record_type&limit=5"
+```
 
-# Search by tire size
-curl "http://localhost:8001/search/products?q=155/80"
+### 🎯 Advanced Filtering
+```bash
+# Boolean AND/OR filtering with sorting
+curl "http://localhost:8001/search?q=155&filters=group%20%3D%20%27SCV%27%20AND%20record_type%20%3D%20%27Tyre%27&sort=size:asc"
 
-# Filter by group
-curl "http://localhost:8001/search/products?group=Tyres"
+# Complex OR filtering
+curl "http://localhost:8001/search?q=&filters=ply_rating%20%3D%20%278PR%27%20OR%20ply_rating%20%3D%20%276PR%27&sort=ply_rating:asc"
+```
 
-# Filter by ply rating
-curl "http://localhost:8001/search/products?ply_rating=8PR"
+### ✨ Search Highlighting & Cropping
+```bash
+# Highlight search terms in results
+curl "http://localhost:8001/search?q=SUPER&highlight=true&attributes_to_highlight=material,pattern_model"
+
+# Custom text cropping and attribute selection
+curl "http://localhost:8001/search?q=ENDUMAXX&attributes_to_retrieve=id,material,size&attributes_to_crop=material&crop_length=50"
+```
+
+### 💡 Autocomplete & Suggestions
+```bash
+# Get intelligent search suggestions
+curl "http://localhost:8001/search/suggestions?q=load&limit=5"
+```
+
+### 🔗 Similar Products Recommendation
+```bash
+# Find similar products based on group, ply rating, and pattern
+curl "http://localhost:8001/search/similar/RTH1YDLXP1A01?limit=5"
+```
+
+### 📊 Filter Options for UI Components
+```bash
+# Get available filter values with counts
+curl "http://localhost:8001/search/filters/groups"
+curl "http://localhost:8001/search/filters/record-types" 
+curl "http://localhost:8001/search/filters/ply-ratings"
+```
+
+### 📈 Analytics & Statistics
+```bash
+# Get comprehensive index analytics
+curl "http://localhost:8001/analytics/stats"
+```
+
+### 🌐 Browse Mode (Facets Only)
+```bash
+# Get facet distributions without search results
+curl "http://localhost:8001/search/facets?q=&facets=group,record_type&limit=0"
+```
+
+## 🚀 Quick Demo
+
+### Interactive Test UI
+Experience all features through our comprehensive web interface:
+```bash
+cd test_ui
+python server.py
+# Visit http://localhost:8080 in your browser
+```
+
+### Command Line Testing
+Run the comprehensive feature demonstration:
+```bash
+python scripts/demo_advanced_features.py
+```
+
+Or test all advanced features:
+```bash
+python scripts/test_advanced_features.py
 ```
 
 ## Apollo Tire Search Configuration
@@ -242,17 +348,63 @@ search_backend/
 3. **Metrics**: Monitor Meilisearch performance metrics
 4. **Alerting**: Set up alerts for indexing failures and search errors
 
-### Deployment
+### Docker Deployment (Production)
+
+For production deployment with Docker:
 
 ```bash
-# Production environment variables
-MEILI_URL=https://your-meilisearch-instance.com
-MEILI_MASTER_KEY=your-secure-master-key
-MEILI_ENV=production
+# Quick deployment with script
+./deploy.sh
 
-# Docker deployment
-docker build -t search-backend .
-docker run -p 8000:8000 --env-file .env search-backend
+# Manual deployment
+docker-compose up -d
+
+# Load Apollo tire data
+docker-compose exec api python scripts/docker_load_data.py
+
+# Check service health
+docker-compose ps
+```
+
+**Docker Services:**
+- **Meilisearch**: http://localhost:7700 (search engine)
+- **API Server**: http://localhost:8001 (FastAPI backend)  
+- **UI Server**: http://localhost:8080 (web interface)
+
+**Management Commands:**
+```bash
+# View logs
+docker-compose logs -f
+
+# Restart services  
+docker-compose restart
+
+# Stop services
+docker-compose down
+
+# Update after code changes
+docker-compose build && docker-compose up -d
+```
+
+See [DOCKER.md](./DOCKER.md) for comprehensive Docker deployment documentation.
+
+### Local Development
+
+```bash
+# Environment variables
+MEILI_URL=http://localhost:7700
+MEILI_MASTER_KEY=your-secure-master-key
+MEILI_ENV=development
+
+# Start Meilisearch only
+docker-compose up -d meilisearch
+
+# Run API locally
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+
+# Run UI locally  
+cd test_ui && python server.py
 ```
 
 ## Frontend Integration

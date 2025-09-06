@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import httpx
 from dotenv import load_dotenv
@@ -18,7 +19,16 @@ from dotenv import load_dotenv
 from meilisearch_python_sdk import AsyncClient
 from meilisearch_python_sdk.models.task import TaskInfo
 
-from .schemas import Product, SearchResponse, IndexSettings, TaskResponse
+from .schemas import (
+    Product, 
+    SearchResponse, 
+    IndexSettings, 
+    TaskResponse, 
+    FacetedSearchResponse, 
+    SimilarProductsResponse, 
+    FilterOption, 
+    SearchSuggestionResponse
+)
 
 # Load environment variables
 load_dotenv()
@@ -119,6 +129,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.post("/index/products", response_model=TaskResponse)
 async def index_products(products: List[Product]):
@@ -213,13 +232,19 @@ async def update_index_settings(settings: IndexSettings):
 @app.get("/search", response_model=SearchResponse)
 async def search_products(
     q: str = Query(..., description="Search query"),
-    filters: Optional[str] = Query(None, description="Filter expression (e.g., 'category = electronics')"),
+    filters: Optional[str] = Query(None, description="Filter expression (e.g., 'group = SCV AND record_type = Tyre')"),
     limit: int = Query(20, ge=1, le=1000, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    sort: Optional[str] = Query(None, description="Sort criteria (e.g., 'price:asc,rating:desc')")
+    sort: Optional[str] = Query(None, description="Sort criteria (e.g., 'size:asc,load_index:desc')"),
+    highlight: bool = Query(False, description="Enable search term highlighting"),
+    crop_length: Optional[int] = Query(None, ge=1, le=1000, description="Length for text cropping"),
+    attributes_to_retrieve: Optional[str] = Query(None, description="Comma-separated list of attributes to return"),
+    attributes_to_highlight: Optional[str] = Query(None, description="Comma-separated list of attributes to highlight"),
+    attributes_to_crop: Optional[str] = Query(None, description="Comma-separated list of attributes to crop"),
+    show_matches_position: bool = Query(False, description="Show position of matches in results")
 ):
     """
-    Search products with filters, pagination, and sorting
+    Advanced search with highlighting, cropping, and custom attribute selection
     See: https://docs.meilisearch.com/reference/api/search.html
     """
     try:
@@ -228,7 +253,8 @@ async def search_products(
         # Prepare search parameters
         search_params = {
             "limit": limit,
-            "offset": offset
+            "offset": offset,
+            "show_matches_position": show_matches_position
         }
         
         # Add filter if provided
@@ -239,6 +265,23 @@ async def search_products(
         if sort:
             sort_list = [s.strip() for s in sort.split(",")]
             search_params["sort"] = sort_list
+        
+        # Add attribute selection
+        if attributes_to_retrieve:
+            search_params["attributes_to_retrieve"] = [attr.strip() for attr in attributes_to_retrieve.split(",")]
+        
+        # Add highlighting
+        if highlight:
+            if attributes_to_highlight:
+                search_params["attributes_to_highlight"] = [attr.strip() for attr in attributes_to_highlight.split(",")]
+            else:
+                search_params["attributes_to_highlight"] = ["*"]
+        
+        # Add cropping
+        if attributes_to_crop:
+            search_params["attributes_to_crop"] = [attr.strip() for attr in attributes_to_crop.split(",")]
+            if crop_length:
+                search_params["crop_length"] = crop_length
         
         # Perform search
         results = await index.search(q, **search_params)
@@ -257,6 +300,304 @@ async def search_products(
     except Exception as e:
         logger.error(f"Search error: {e}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.get("/search/facets", response_model=FacetedSearchResponse)
+async def search_with_facets(
+    q: str = Query("", description="Search query (can be empty for facet-only search)"),
+    facets: str = Query(..., description="Comma-separated list of facets to retrieve (e.g., 'group,record_type,ply_rating')"),
+    filters: Optional[str] = Query(None, description="Filter expression"),
+    limit: int = Query(20, ge=0, le=1000, description="Number of results to return (0 for facets only)"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    max_values_per_facet: int = Query(100, ge=1, le=1000, description="Maximum number of values per facet")
+):
+    """
+    Faceted search for filtering and analytics
+    Returns search results along with facet counts for building filter UIs
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # Prepare search parameters
+        search_params = {
+            "limit": limit,
+            "offset": offset,
+            "facets": [facet.strip() for facet in facets.split(",")]
+        }
+        
+        # Add filter if provided
+        if filters:
+            search_params["filter"] = filters
+        
+        # Perform search
+        results = await index.search(q, **search_params)
+        
+        logger.info(f"Faceted search query '{q}' returned {len(results.hits)} results with facets: {facets}")
+        
+        return FacetedSearchResponse(
+            hits=results.hits,
+            facet_distribution=getattr(results, 'facet_distribution', {}),
+            query=q,
+            processing_time_ms=results.processing_time_ms,
+            limit=limit,
+            offset=offset,
+            estimated_total_hits=getattr(results, 'estimated_total_hits', len(results.hits))
+        )
+        
+    except Exception as e:
+        logger.error(f"Faceted search error: {e}")
+        raise HTTPException(status_code=500, detail=f"Faceted search failed: {str(e)}")
+
+
+@app.get("/search/filters/groups")
+async def get_available_groups():
+    """
+    Get all available product groups for filter UI
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # Search with group facet to get all available groups
+        results = await index.search("", facets=["group"], limit=0)
+        groups = getattr(results, 'facet_distribution', {}).get('group', {})
+        
+        return {
+            "groups": [{"value": group, "count": count} for group, count in groups.items()],
+            "total_groups": len(groups)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting groups: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get groups: {str(e)}")
+
+
+@app.get("/search/filters/record-types")
+async def get_available_record_types():
+    """
+    Get all available record types for filter UI
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        results = await index.search("", facets=["record_type"], limit=0)
+        record_types = getattr(results, 'facet_distribution', {}).get('record_type', {})
+        
+        return {
+            "record_types": [{"value": rt, "count": count} for rt, count in record_types.items()],
+            "total_record_types": len(record_types)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting record types: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get record types: {str(e)}")
+
+
+@app.get("/search/filters/ply-ratings")
+async def get_available_ply_ratings():
+    """
+    Get all available ply ratings for filter UI
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        results = await index.search("", facets=["ply_rating"], limit=0)
+        ply_ratings = getattr(results, 'facet_distribution', {}).get('ply_rating', {})
+        
+        return {
+            "ply_ratings": [{"value": pr, "count": count} for pr, count in ply_ratings.items() if pr],
+            "total_ply_ratings": len([pr for pr in ply_ratings.keys() if pr])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting ply ratings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get ply ratings: {str(e)}")
+
+
+@app.get("/search/suggestions", response_model=SearchSuggestionResponse)
+async def get_search_suggestions(
+    q: str = Query(..., description="Partial search query"),
+    limit: int = Query(5, ge=1, le=20, description="Number of suggestions to return")
+):
+    """
+    Get search suggestions/autocomplete based on indexed content
+    Uses prefix search on pattern_model and material fields
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # Search for suggestions using prefix matching
+        results = await index.search(
+            q,
+            attributes_to_retrieve=["pattern_model", "material", "mpn", "size"],
+            limit=limit * 5  # Get more results to extract suggestions
+        )
+        
+        # Extract unique suggestions
+        suggestions = set()
+        query_lower = q.lower()
+        
+        for hit in results.hits:
+            # Add pattern model if it starts with or contains the query
+            if hit.get('pattern_model'):
+                pattern = hit['pattern_model']
+                if query_lower in pattern.lower():
+                    suggestions.add(pattern)
+                
+                # Also add individual words from pattern that start with query
+                for word in pattern.split():
+                    if word.lower().startswith(query_lower) and len(word) > 2:
+                        suggestions.add(word)
+            
+            # Add meaningful words from material description
+            if hit.get('material'):
+                material_words = hit['material'].split()
+                for word in material_words:
+                    if word.lower().startswith(query_lower) and len(word) > 2:
+                        # Clean up the word (remove special characters)
+                        clean_word = ''.join(c for c in word if c.isalnum())
+                        if len(clean_word) > 2:
+                            suggestions.add(clean_word)
+            
+            if len(suggestions) >= limit * 2:
+                break
+        
+        return SearchSuggestionResponse(
+            suggestions=list(suggestions)[:limit],
+            query=q
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting suggestions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get suggestions: {str(e)}")
+
+
+@app.get("/search/similar/{product_id}", response_model=SimilarProductsResponse)
+async def get_similar_products(
+    product_id: str,
+    limit: int = Query(10, ge=1, le=50, description="Number of similar products to return")
+):
+    """
+    Find similar products based on a given product ID
+    Uses shared attributes like group, size, ply_rating, pattern_model
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # First, get the reference product by searching for the exact ID
+        results = await index.search(
+            product_id,
+            attributes_to_retrieve=["id", "group", "size", "ply_rating", "pattern_model", "material", "mpn", "record_type"],
+            limit=10  # Get a few results in case there are similar IDs
+        )
+        
+        # Find the exact match
+        ref_product = None
+        for hit in results.hits:
+            if hit.get('id') == product_id:
+                ref_product = hit
+                break
+        
+        if not ref_product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Build similarity search using only filterable attributes
+        search_query = ""
+        
+        # Search for products with similar pattern
+        if ref_product.get('pattern_model'):
+            search_query = ref_product['pattern_model']
+        elif ref_product.get('group'):
+            search_query = ref_product['group']
+        
+        # Use only filterable attributes for filters
+        filters = []
+        
+        # Same group (filterable)
+        if ref_product.get('group'):
+            filters.append(f"group = '{ref_product['group']}'")
+        
+        # Same ply rating (filterable)
+        if ref_product.get('ply_rating'):
+            filters.append(f"ply_rating = '{ref_product['ply_rating']}'")
+        
+        # Same record type (filterable)
+        if ref_product.get('record_type'):
+            filters.append(f"record_type = '{ref_product['record_type']}'")
+        
+        # Combine filters - require same group, make others optional
+        filter_expression = None
+        if ref_product.get('group'):
+            base_filter = f"group = '{ref_product['group']}'"
+            
+            optional_filters = []
+            if ref_product.get('ply_rating'):
+                optional_filters.append(f"ply_rating = '{ref_product['ply_rating']}'")
+            if ref_product.get('record_type'):
+                optional_filters.append(f"record_type = '{ref_product['record_type']}'")
+            
+            if optional_filters:
+                filter_expression = f"{base_filter} AND ({' OR '.join(optional_filters)})"
+            else:
+                filter_expression = base_filter
+        
+        # Search for similar products
+        similar_results = await index.search(
+            search_query,
+            filter=filter_expression,
+            limit=limit + 10,  # Get extra results to filter out the original
+            attributes_to_retrieve=["id", "material", "mpn", "size", "group", "record_type", "ply_rating", "pattern_model"]
+        )
+        
+        # Filter out the original product from results
+        filtered_hits = [hit for hit in similar_results.hits if hit.get('id') != product_id][:limit]
+        
+        return SimilarProductsResponse(
+            reference_product=ref_product,
+            similar_products=filtered_hits,
+            total_found=len(filtered_hits),
+            processing_time_ms=similar_results.processing_time_ms
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error finding similar products: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to find similar products: {str(e)}")
+
+
+@app.get("/analytics/stats")
+async def get_search_statistics():
+    """
+    Get search index statistics and analytics
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # Get index stats
+        stats = await index.get_stats()
+        
+        # Get facet distributions for analytics
+        facet_search = await index.search("", facets=["group", "record_type", "ply_rating"], limit=0)
+        facets = getattr(facet_search, 'facet_distribution', {})
+        
+        return {
+            "index_stats": {
+                "number_of_documents": stats.number_of_documents,
+                "is_indexing": stats.is_indexing,
+                "field_distribution": getattr(stats, 'field_distribution', {})
+            },
+            "facet_analytics": {
+                "groups": facets.get('group', {}),
+                "record_types": facets.get('record_type', {}),
+                "ply_ratings": {k: v for k, v in facets.get('ply_rating', {}).items() if k}
+            },
+            "top_groups": sorted(facets.get('group', {}).items(), key=lambda x: x[1], reverse=True)[:10],
+            "top_record_types": sorted(facets.get('record_type', {}).items(), key=lambda x: x[1], reverse=True)[:10]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting statistics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
 
 
 @app.get("/health")

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Controls Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Search Controls Test - Multiple Searches</h2>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Search Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Search Query</label>
+                            <div class="search-input-wrapper">
+                                <div class="input-group">
+                                    <input type="text" id="searchQuery" class="form-control" placeholder="Enter search term">
+                                    <button class="btn btn-primary" onclick="performSearch()">
+                                        <i class="fas fa-search"></i> Search
+                                    </button>
+                                </div>
+                                <div id="suggestions" class="suggestions-dropdown"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Search Type</label>
+                            <select id="searchType" class="form-select">
+                                <option value="basic">Basic Search</option>
+                                <option value="faceted">Faceted Search</option>
+                                <option value="highlighted">Highlighted Search</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Results Per Page</label>
+                            <select id="limitSelect" class="form-select">
+                                <option value="10">10</option>
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Hidden form elements that the script expects -->
+                        <div style="display: none;">
+                            <select id="groupFilter"><option value="">All Groups</option></select>
+                            <select id="recordTypeFilter"><option value="">All Types</option></select>
+                            <select id="plyRatingFilter"><option value="">All Ratings</option></select>
+                            <input id="customFilter" value="">
+                            <select id="sortField"><option value="">Relevance</option></select>
+                            <input type="checkbox" id="highlightResults">
+                            <input type="checkbox" id="showMatchPositions">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" onclick="loadSampleSearch('LOADSTAR')">
+                                Test: LOADSTAR
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="loadSampleSearch('155/80')">
+                                Test: 155/80
+                            </button>
+                            <button class="btn btn-outline-success" onclick="loadSampleSearch('Apollo')">
+                                Test: Apollo
+                            </button>
+                            <button class="btn btn-outline-info" onclick="testMultipleSearches()">
+                                Test Multiple Searches
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <h5>Search Results</h5>
+                        <div>
+                            <span id="resultsCount" class="badge bg-secondary">0</span>
+                            <span id="processingTime" class="text-muted small"></span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="searchResults" style="max-height: 400px; overflow-y: auto;">
+                            <div id="welcomeCard" class="text-center py-4">
+                                <h4>Ready to test search controls</h4>
+                                <p class="text-muted">Click the buttons to test multiple searches</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Debug Log -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>Debug Log</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearDebugLog()">Clear</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="debugLog" style="height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
+                            <p><strong>Debug log will appear here...</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hidden elements for pagination -->
+        <nav id="pagination" style="display: none;">
+            <ul class="pagination"></ul>
+        </nav>
+        
+        <!-- Hidden elements for similar products -->
+        <div id="similarProductsSection" style="display: none;">
+            <div id="similarProductsContent"></div>
+        </div>
+        
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+        
+        <!-- Facets panel -->
+        <div id="facetsPanel" style="display: none;">
+            <div id="facetsContent"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.APOLLO_API_URL = 'http://localhost:8001';
+        
+        // Override console.log to also display in debug log
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        function addToDebugLog(message, type = 'log') {
+            const debugLog = document.getElementById('debugLog');
+            if (debugLog) {
+                const timestamp = new Date().toLocaleTimeString();
+                const color = type === 'error' ? 'text-danger' : type === 'warn' ? 'text-warning' : 'text-primary';
+                debugLog.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+                debugLog.scrollTop = debugLog.scrollHeight;
+            }
+        }
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            addToDebugLog(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            addToDebugLog(args.join(' '), 'error');
+        };
+        
+        function clearDebugLog() {
+            document.getElementById('debugLog').innerHTML = '<p><strong>Debug log cleared...</strong></p>';
+        }
+        
+        function testMultipleSearches() {
+            console.log('🔄 Starting multiple search test...');
+            
+            const queries = ['LOADSTAR', '155/80', 'Apollo', 'Truck', 'Passenger'];
+            let currentIndex = 0;
+            
+            function runNextSearch() {
+                if (currentIndex < queries.length) {
+                    const query = queries[currentIndex];
+                    console.log(`🔍 Test search ${currentIndex + 1}/${queries.length}: ${query}`);
+                    document.getElementById('searchQuery').value = query;
+                    performSearch();
+                    currentIndex++;
+                    
+                    // Wait 2 seconds before next search
+                    setTimeout(runNextSearch, 2000);
+                } else {
+                    console.log('✅ Multiple search test completed!');
+                }
+            }
+            
+            runNextSearch();
+        }
+        
+        // Log when page is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 Test page loaded and ready');
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

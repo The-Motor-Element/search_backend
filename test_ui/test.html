@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UI Test</title>
+</head>
+<body>
+    <h1>Testing Apollo Tire Search UI</h1>
+    <div id="result"></div>
+    
+    <script>
+        async function testSearch() {
+            try {
+                const response = await fetch('http://localhost:8001/health');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: green;">✅ API Connection: ' + data.status + '</p>';
+                
+                // Test search
+                const searchResponse = await fetch('http://localhost:8001/search?q=LOADSTAR&limit=2');
+                const searchData = await searchResponse.json();
+                document.getElementById('result').innerHTML += 
+                    '<p style="color: green;">✅ Search Results: ' + searchData.hits.length + ' items found</p>';
+                    
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: red;">❌ Error: ' + error.message + '</p>';
+            }
+        }
+        
+        testSearch();
+    </script>
+</body>
+</html>

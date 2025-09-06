@@ -198,3 +198,104 @@ class TaskResponse(BaseModel):
                 }
             }
         }
+
+
+class FacetedSearchResponse(BaseModel):
+    """
+    Faceted search response model with facet distribution
+    """
+    hits: List[Dict[str, Any]] = Field(..., description="Search results")
+    facet_distribution: Dict[str, Dict[str, int]] = Field(..., description="Facet counts for each filterable attribute")
+    query: str = Field(..., description="Original search query")
+    processing_time_ms: int = Field(..., description="Search processing time in milliseconds")
+    limit: int = Field(..., description="Maximum number of results requested")
+    offset: int = Field(..., description="Number of results skipped")
+    estimated_total_hits: int = Field(..., description="Estimated total number of matching documents")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "hits": [
+                    {
+                        "id": "RTH1YDLXP1A01",
+                        "title": "155/80 D12 8PR LOADSTAR SUPER XP - D",
+                        "group": "SCV",
+                        "record_type": "Tyre"
+                    }
+                ],
+                "facet_distribution": {
+                    "group": {"SCV": 45, "PCR": 123, "TBR": 67},
+                    "record_type": {"Tyre": 1000, "Flaps": 89, "Tube": 234},
+                    "ply_rating": {"8PR": 125, "6PR": 89, "4PR": 234}
+                },
+                "query": "apollo",
+                "processing_time_ms": 25,
+                "limit": 20,
+                "offset": 0,
+                "estimated_total_hits": 1557
+            }
+        }
+
+
+class SimilarProductsResponse(BaseModel):
+    """
+    Similar products response model
+    """
+    reference_product: Dict[str, Any] = Field(..., description="The reference product used for similarity")
+    similar_products: List[Dict[str, Any]] = Field(..., description="List of similar products")
+    total_found: int = Field(..., description="Total number of similar products found")
+    processing_time_ms: int = Field(..., description="Search processing time in milliseconds")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "reference_product": {
+                    "id": "RTH1YDLXP1A01",
+                    "group": "SCV",
+                    "size": "155/80 D12",
+                    "ply_rating": "8PR"
+                },
+                "similar_products": [
+                    {
+                        "id": "RTH1YDLXP1A02",
+                        "group": "SCV",
+                        "size": "155/80 D12",
+                        "ply_rating": "8PR"
+                    }
+                ],
+                "total_found": 5,
+                "processing_time_ms": 15
+            }
+        }
+
+
+class FilterOption(BaseModel):
+    """
+    Filter option model for UI components
+    """
+    value: str = Field(..., description="Filter value")
+    count: int = Field(..., description="Number of products with this filter value")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "value": "SCV",
+                "count": 45
+            }
+        }
+
+
+class SearchSuggestionResponse(BaseModel):
+    """
+    Search suggestion/autocomplete response
+    """
+    suggestions: List[str] = Field(..., description="List of search suggestions")
+    query: str = Field(..., description="Original query used for suggestions")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "suggestions": ["LOADSTAR", "LOADSTAR SUPER XP", "LOAD INDEX"],
+                "query": "load"
+            }
+        }

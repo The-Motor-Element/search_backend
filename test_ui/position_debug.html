@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Positioning Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <style>
+        .debug-box {
+            border: 2px solid red;
+            background-color: rgba(255, 0, 0, 0.1);
+        }
+        .wrapper-debug {
+            border: 2px solid blue;
+            background-color: rgba(0, 0, 255, 0.1);
+        }
+        .suggestions-debug {
+            border: 2px solid green;
+            background-color: rgba(0, 255, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>🔧 Autocomplete Positioning Debug</h1>
+        
+        <div class="alert alert-info">
+            <strong>Debug Mode:</strong> Visual boundaries are shown to help debug positioning.
+            <ul>
+                <li><span style="color: red;">Red border:</span> Input group container</li>
+                <li><span style="color: blue;">Blue border:</span> Search wrapper (positioning context)</li>
+                <li><span style="color: green;">Green border:</span> Suggestions dropdown</li>
+            </ul>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Autocomplete Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Search Query</label>
+                            <div class="search-input-wrapper wrapper-debug">
+                                <div class="input-group debug-box">
+                                    <input type="text" id="searchQuery" class="form-control" placeholder="Type 'LOAD' to test">
+                                    <button class="btn btn-primary" onclick="testSearch()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <div id="suggestions" class="suggestions-dropdown suggestions-debug">
+                                    <!-- Test suggestions will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="showTestSuggestions()">Show Test Suggestions</button>
+                            <button class="btn btn-warning" onclick="hideTestSuggestions()">Hide Suggestions</button>
+                            <button class="btn btn-info" onclick="testRealAPI()">Test Real API</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Position Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="positionInfo">
+                            <p><strong>Wrapper Position:</strong> <span id="wrapperPos">-</span></p>
+                            <p><strong>Input Group Position:</strong> <span id="inputPos">-</span></p>
+                            <p><strong>Suggestions Position:</strong> <span id="suggestionsPos">-</span></p>
+                            <p><strong>Suggestions Display:</strong> <span id="suggestionsDisplay">-</span></p>
+                        </div>
+                        <button class="btn btn-outline-primary" onclick="updatePositionInfo()">Refresh Position Info</button>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>CSS Debug</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="cssInfo" style="font-family: monospace; font-size: 12px;">
+                            <!-- CSS info will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTestSuggestions() {
+            const suggestions = document.getElementById('suggestions');
+            suggestions.innerHTML = `
+                <div class="suggestion-item">🔍 LOADSTAR SUPER XP</div>
+                <div class="suggestion-item">🔍 LOADSTAR</div>
+                <div class="suggestion-item">🔍 LOADSTAR SUPER</div>
+            `;
+            suggestions.style.display = 'block';
+            updatePositionInfo();
+        }
+        
+        function hideTestSuggestions() {
+            const suggestions = document.getElementById('suggestions');
+            suggestions.style.display = 'none';
+            updatePositionInfo();
+        }
+        
+        function testSearch() {
+            console.log('Test search clicked');
+            showTestSuggestions();
+        }
+        
+        async function testRealAPI() {
+            try {
+                const response = await fetch('http://localhost:8001/search/suggestions?q=LOAD&limit=3');
+                const data = await response.json();
+                
+                const suggestions = document.getElementById('suggestions');
+                suggestions.innerHTML = data.suggestions.map(s => 
+                    `<div class="suggestion-item">🔍 ${s}</div>`
+                ).join('');
+                suggestions.style.display = 'block';
+                updatePositionInfo();
+                
+                console.log('Real API test successful:', data);
+            } catch (error) {
+                console.error('API test failed:', error);
+                alert('API test failed: ' + error.message);
+            }
+        }
+        
+        function updatePositionInfo() {
+            const wrapper = document.querySelector('.search-input-wrapper');
+            const inputGroup = document.querySelector('.input-group');
+            const suggestions = document.getElementById('suggestions');
+            
+            function getElementInfo(element, name) {
+                if (!element) return `${name}: Not found`;
+                const rect = element.getBoundingClientRect();
+                const styles = window.getComputedStyle(element);
+                return `${name}: top=${Math.round(rect.top)}, left=${Math.round(rect.left)}, width=${Math.round(rect.width)}, height=${Math.round(rect.height)}, position=${styles.position}`;
+            }
+            
+            document.getElementById('wrapperPos').textContent = getElementInfo(wrapper, 'Wrapper');
+            document.getElementById('inputPos').textContent = getElementInfo(inputGroup, 'Input');
+            document.getElementById('suggestionsPos').textContent = getElementInfo(suggestions, 'Suggestions');
+            document.getElementById('suggestionsDisplay').textContent = suggestions ? suggestions.style.display || 'default' : 'Not found';
+            
+            // CSS Debug
+            if (suggestions) {
+                const styles = window.getComputedStyle(suggestions);
+                document.getElementById('cssInfo').innerHTML = `
+                    position: ${styles.position}<br>
+                    top: ${styles.top}<br>
+                    left: ${styles.left}<br>
+                    right: ${styles.right}<br>
+                    z-index: ${styles.zIndex}<br>
+                    display: ${styles.display}<br>
+                    width: ${styles.width}
+                `;
+            }
+        }
+        
+        // Auto-update position info
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePositionInfo();
+            setInterval(updatePositionInfo, 1000);
+        });
+        
+        // Test typing simulation
+        document.getElementById('searchQuery').addEventListener('input', function() {
+            if (this.value.toLowerCase().includes('load')) {
+                showTestSuggestions();
+            } else if (this.value.length === 0) {
+                hideTestSuggestions();
+            }
+        });
+    </script>
+</body>
+</html>

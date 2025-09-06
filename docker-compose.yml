@@ -17,6 +17,55 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - search_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8001:8001"
+    environment:
+      - MEILI_URL=http://meilisearch:7700
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-development_key_please_change_in_production}
+      - PYTHONPATH=/app
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - search_network
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - API_URL=http://localhost:8001
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - search_network
+
+networks:
+  search_network:
+    driver: bridge
 
 volumes:
   meilisearch_data:
