@@ -202,16 +202,19 @@ For production use, consider:
 
 When ready for production, you can:
 
-1. **Use the full ECS deployment**:
-   ```bash
-   ./deploy-aws.sh  # Full production deployment
-   ```
+1. **Upgrade to larger EC2 instances**:
+   - Switch from t2.micro to t3.small or larger
+   - Add more instances behind a load balancer
 
 2. **Migrate to managed services**:
    - Amazon OpenSearch for search
    - RDS for application data
    - ElastiCache for caching
    - CloudFront for CDN
+
+3. **Use container orchestration**:
+   - Deploy with AWS ECS or EKS
+   - Implement auto-scaling policies
 
 ## 🗑️ **Cleanup**
 
@@ -286,7 +289,7 @@ sudo truncate -s 0 /var/log/messages
 2. **Test Search Features**: Use the UI to test faceted search, autocomplete, and analytics
 3. **Load Your Data**: Replace demo data with your own product catalog
 4. **Customize UI**: Modify the test UI for your specific use case
-5. **Plan Production**: When ready, use the full ECS deployment for production
+5. **Plan Production**: When ready, scale to larger instances or managed services
 
 ---
 

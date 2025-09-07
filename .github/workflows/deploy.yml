@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Test and Build
 
 on:
   push:
@@ -32,53 +32,56 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Start services with Docker Compose
+      run: |
+        # Set environment variables for testing
+        export MEILI_MASTER_KEY=test_key_for_ci
+        export MEILI_ENV=development
+        
+        # Start services in detached mode
+        docker-compose up -d
+        
+        # Show running containers and ports
+        echo "Docker containers status:"
+        docker-compose ps
+        
+        # Validate port configuration
+        python scripts/validate_docker_ports.py
+        
+    - name: Wait for services to be healthy
+      run: |
+        # Install requests for health check script
+        pip install requests
+        
+        # Set environment variables for health checks
+        export MEILI_URL=http://localhost:7700
+        export API_BASE_URL=http://localhost:8001
+        export MEILI_MASTER_KEY=test_key_for_ci
+        
+        # Run comprehensive health checks
+        python scripts/test_health_checks.py
+        
+    - name: Configure test environment
+      run: |
+        # Create a symlink or update test configuration to use the correct port
+        # Since Docker Compose maps API to port 8001, but tests expect 8000
+        # We'll override the API_BASE_URL for tests
+        export API_BASE_URL=http://localhost:8001
+        
     - name: Run tests
       run: |
-        python -m pytest tests/ -v
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        # Run tests with the correct API URL
+        API_BASE_URL=http://localhost:8001 python -m pytest tests/ -v
         
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-      
-    - name: Build, tag, and push API image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY_API: apollo-search-api
-        IMAGE_TAG: ${{ github.sha }}
+    - name: Show service logs on failure
+      if: failure()
       run: |
-        docker build -f Dockerfile.api -t $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
+        echo "=== Meilisearch logs ==="
+        docker-compose logs meilisearch
+        echo "=== API logs ==="
+        docker-compose logs api
         
-    - name: Build, tag, and push UI image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY_UI: apollo-search-ui
-        IMAGE_TAG: ${{ github.sha }}
+    - name: Cleanup
+      if: always()
       run: |
-        docker build -f Dockerfile.ui -t $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_UI:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_UI:latest
-        
-    - name: Deploy to ECS
-      run: |
-        aws ecs update-service --cluster apollo-search-cluster --service apollo-search-api-service --force-new-deployment
-        aws ecs update-service --cluster apollo-search-cluster --service apollo-search-ui-service --force-new-deployment
+        docker-compose down -v

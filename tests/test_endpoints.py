@@ -3,14 +3,15 @@ Test suite for E-commerce Search Backend
 Tests indexing, search functionality, and settings configuration
 """
 
+import os
 import pytest
 import pytest_asyncio
 import httpx
 import asyncio
 from typing import List, Dict, Any
 
-# Test configuration
-API_BASE_URL = "http://localhost:8000"
+# Test configuration - Allow override via environment variable
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 TEST_TIMEOUT = 30
 
 
@@ -106,7 +107,7 @@ class TestHealthEndpoint:
         assert "status" in data
         assert "meilisearch" in data
         assert "service" in data
-        assert data["service"] == "e-commerce-search-backend"
+        assert data["service"] == "apollo-tire-search-backend"
 
 
 class TestIndexingEndpoints:

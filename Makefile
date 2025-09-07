@@ -1,4 +1,4 @@
-.PHONY: help install setup start stop seed test clean validate docs
+.PHONY: help install setup start stop seed test clean validate docs health test-ci
 
 # Default target
 help:
@@ -10,6 +10,8 @@ help:
 	@echo "  stop       - Stop all services"
 	@echo "  seed       - Seed sample data"
 	@echo "  test       - Run tests"
+	@echo "  test-ci    - Run tests for CI (with Docker services)"
+	@echo "  health     - Check service health"
 	@echo "  validate   - Validate setup"
 	@echo "  clean      - Clean up containers and volumes"
 	@echo "  docs       - Open API documentation"
@@ -47,6 +49,25 @@ seed:
 # Run tests
 test:
 	pytest tests/ -v
+
+# Run tests for CI environment (with Docker services)
+test-ci:
+	@echo "Starting services for testing..."
+	docker-compose up -d
+	@echo "Checking service health..."
+	python scripts/test_health_checks.py
+	@echo "Running tests..."
+	API_BASE_URL=http://localhost:8001 pytest tests/ -v
+	@echo "Stopping services..."
+	docker-compose down
+
+# Check service health
+health:
+	python scripts/test_health_checks.py
+
+# Validate Docker port configuration
+ports:
+	python scripts/validate_docker_ports.py
 
 # Validate setup
 validate:
