@@ -72,7 +72,7 @@ make dev
 
 ```bash
 # 1. Start services
-docker-compose up -d
+docker compose up -d  # or docker-compose up -d on older systems
 
 # 2. Check health
 python scripts/test_health_checks.py
@@ -81,14 +81,14 @@ python scripts/test_health_checks.py
 API_BASE_URL=http://localhost:8001 pytest tests/ -v
 
 # 4. Cleanup
-docker-compose down
+docker compose down  # or docker-compose down
 ```
 
 ### Method 3: Local Development
 
 ```bash
 # 1. Start only Meilisearch
-docker-compose up -d meilisearch
+docker compose up -d meilisearch  # or docker-compose up -d meilisearch
 
 # 2. Start API locally
 uvicorn app.main:app --reload --port 8000
@@ -113,7 +113,7 @@ pytest tests/ -v
    lsof -i :7700
    
    # Stop conflicting services
-   docker-compose down
+   docker compose down  # or docker-compose down
    ```
 
 3. **Test Configuration Issues**
@@ -125,8 +125,8 @@ pytest tests/ -v
 
 ```bash
 # Check Docker status
-docker-compose ps
-docker-compose logs
+docker compose ps  # or docker-compose ps
+docker compose logs  # or docker-compose logs
 
 # Test endpoints manually
 curl http://localhost:7700/health

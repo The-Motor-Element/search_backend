@@ -1,20 +1,22 @@
-.PHONY: help install setup start stop seed test clean validate docs health test-ci
+.PHONY: help install setup start stop seed test clean validate docs health test-ci ports docker-test
 
 # Default target
 help:
 	@echo "E-commerce Search Backend - Available Commands:"
 	@echo ""
-	@echo "  install    - Install Python dependencies"
-	@echo "  setup      - Setup environment and start services"
-	@echo "  start      - Start all services (Meilisearch + API)"
-	@echo "  stop       - Stop all services"
-	@echo "  seed       - Seed sample data"
-	@echo "  test       - Run tests"
-	@echo "  test-ci    - Run tests for CI (with Docker services)"
-	@echo "  health     - Check service health"
-	@echo "  validate   - Validate setup"
-	@echo "  clean      - Clean up containers and volumes"
-	@echo "  docs       - Open API documentation"
+	@echo "  install      - Install Python dependencies"
+	@echo "  setup        - Setup environment and start services"
+	@echo "  start        - Start all services (Meilisearch + API)"
+	@echo "  stop         - Stop all services"
+	@echo "  seed         - Seed sample data"
+	@echo "  test         - Run tests"
+	@echo "  test-ci      - Run tests for CI (with Docker services)"
+	@echo "  health       - Check service health"
+	@echo "  ports        - Validate Docker port configuration"
+	@echo "  docker-test  - Test Docker Compose compatibility"
+	@echo "  validate     - Validate setup"
+	@echo "  clean        - Clean up containers and volumes"
+	@echo "  docs         - Open API documentation"
 	@echo ""
 
 # Install Python dependencies
@@ -25,7 +27,7 @@ install:
 setup: install
 	@echo "Setting up environment..."
 	@cp .env.example .env || echo ".env already exists"
-	docker-compose up -d
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose up -d || docker compose up -d
 	@echo "Waiting for Meilisearch to start..."
 	@sleep 5
 	@echo "Setup complete!"
@@ -33,14 +35,14 @@ setup: install
 # Start services
 start:
 	@echo "Starting Meilisearch..."
-	docker-compose up -d
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose up -d || docker compose up -d
 	@echo "Starting API server..."
 	@echo "Run: uvicorn app.main:app --reload --port 8000"
 
 # Stop services
 stop:
 	@echo "Stopping services..."
-	docker-compose down
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose down || docker compose down
 
 # Seed sample data
 seed:
@@ -53,13 +55,13 @@ test:
 # Run tests for CI environment (with Docker services)
 test-ci:
 	@echo "Starting services for testing..."
-	docker-compose up -d
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose up -d || docker compose up -d
 	@echo "Checking service health..."
 	python scripts/test_health_checks.py
 	@echo "Running tests..."
 	API_BASE_URL=http://localhost:8001 pytest tests/ -v
 	@echo "Stopping services..."
-	docker-compose down
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose down || docker compose down
 
 # Check service health
 health:
@@ -69,13 +71,17 @@ health:
 ports:
 	python scripts/validate_docker_ports.py
 
+# Test Docker Compose compatibility
+docker-test:
+	python scripts/test_docker_compose.py
+
 # Validate setup
 validate:
 	python scripts/validate_setup.py
 
 # Clean up
 clean:
-	docker-compose down -v
+	@command -v docker-compose >/dev/null 2>&1 && docker-compose down -v || docker compose down -v
 	docker system prune -f
 
 # Open documentation

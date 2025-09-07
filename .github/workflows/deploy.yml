@@ -32,6 +32,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Test Docker Compose compatibility
+      run: |
+        python scripts/test_docker_compose.py
+        
     - name: Start services with Docker Compose
       run: |
         # Set environment variables for testing
@@ -39,11 +43,11 @@ jobs:
         export MEILI_ENV=development
         
         # Start services in detached mode
-        docker-compose up -d
+        docker compose up -d
         
         # Show running containers and ports
         echo "Docker containers status:"
-        docker-compose ps
+        docker compose ps
         
         # Validate port configuration
         python scripts/validate_docker_ports.py
@@ -77,11 +81,11 @@ jobs:
       if: failure()
       run: |
         echo "=== Meilisearch logs ==="
-        docker-compose logs meilisearch
+        docker compose logs meilisearch
         echo "=== API logs ==="
-        docker-compose logs api
+        docker compose logs api
         
     - name: Cleanup
       if: always()
       run: |
-        docker-compose down -v
+        docker compose down -v

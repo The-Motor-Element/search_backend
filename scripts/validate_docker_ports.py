@@ -105,8 +105,8 @@ def main():
     else:
         print("\n💥 Port validation failed!")
         print("\n🔧 Try:")
-        print("  1. docker-compose up -d")
-        print("  2. docker-compose ps")
+        print("  1. docker compose up -d (or docker-compose up -d)")
+        print("  2. docker compose ps (or docker-compose ps)")
         print("  3. Check docker-compose.yml port mappings")
         sys.exit(1)
 
