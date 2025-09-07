@@ -55,8 +55,8 @@ def main():
     # Test API
     success &= test_url(f"{API_BASE_URL}/health", "API")
     
-    # Test basic search
-    success &= test_url(f"{API_BASE_URL}/search?q=test", "Basic Search")
+    # Test basic search (use a term that exists in Apollo tire data)
+    success &= test_url(f"{API_BASE_URL}/search?q=LOADSTAR&limit=1", "Basic Search")
     
     print()
     if success:
