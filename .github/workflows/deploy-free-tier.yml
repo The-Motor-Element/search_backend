@@ -49,6 +49,8 @@ jobs:
         
     - name: Deploy Free Tier Stack
       run: |
+        echo "DEPLOYMENT_START_TIME=$(date +%s)" >> $GITHUB_ENV
+        
         MEILI_MASTER_KEY="demo-$(openssl rand -hex 12)"
         echo "Generated MEILI_MASTER_KEY: $MEILI_MASTER_KEY"
         
@@ -174,7 +176,7 @@ jobs:
               
               # Test different ports
               echo "🔌 Testing port connectivity:"
-              nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 8001 && echo "✅ Port 8001 (API) is open" || echo "❌ Port 8001 (API) not accessible"
+              nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 8000 && echo "✅ Port 8000 (API) is open" || echo "❌ Port 8000 (API) not accessible"
               nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 8080 && echo "✅ Port 8080 (UI) is open" || echo "❌ Port 8080 (UI) not accessible"  
               nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 7700 && echo "✅ Port 7700 (MeiliSearch) is open" || echo "❌ Port 7700 (MeiliSearch) not accessible"
               
@@ -198,7 +200,7 @@ jobs:
           echo "📊 Final diagnostic attempt:"
           echo "🌐 Instance IP: ${{ steps.deployment-info.outputs.public-ip }}"
           echo "🔌 Final port tests:"
-          nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 8001 && echo "✅ Port 8001 accessible" || echo "❌ Port 8001 not accessible"
+          nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 8000 && echo "✅ Port 8000 accessible" || echo "❌ Port 8000 not accessible"
           nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 8080 && echo "✅ Port 8080 accessible" || echo "❌ Port 8080 not accessible"
           nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 7700 && echo "✅ Port 7700 accessible" || echo "❌ Port 7700 not accessible"
           
@@ -379,7 +381,7 @@ jobs:
         
         # Port Connectivity Summary
         echo "🔌 Port connectivity summary:"
-        echo "   🌐 Port 3000 (UI): $(curl -s --connect-timeout 10 --max-time 20 "$UI_URL" >/dev/null 2>&1 && echo "✅ ACCESSIBLE" || echo "❌ FAILED")"
+        echo "   🌐 Port 8080 (UI): $(curl -s --connect-timeout 10 --max-time 20 "$UI_URL" >/dev/null 2>&1 && echo "✅ ACCESSIBLE" || echo "❌ FAILED")"
         echo "   📡 Port 8000 (API): $(curl -s --connect-timeout 10 --max-time 20 "$API_URL/health" >/dev/null 2>&1 && echo "✅ ACCESSIBLE" || echo "❌ FAILED")"
         echo ""
         
@@ -420,7 +422,10 @@ jobs:
         echo "   📦 Restart Services: ssh ... 'cd /opt/apollo-search && sudo docker-compose restart'"
         echo ""
         echo "⏱️ Deployment completed at: $(date)"
-        echo "🕐 Total deployment time: $(($(date +%s) - ${{ env.DEPLOYMENT_START_TIME }})) seconds"
+        if [ -n "${{ env.DEPLOYMENT_START_TIME }}" ]; then
+          TOTAL_TIME=$(($(date +%s) - ${{ env.DEPLOYMENT_START_TIME }}))
+          echo "🕐 Total deployment time: $TOTAL_TIME seconds"
+        fi
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
     - name: Create Deployment Summary
