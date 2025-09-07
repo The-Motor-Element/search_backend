@@ -188,56 +188,21 @@ Resources:
           # Verify Docker Compose installation
           docker-compose --version
           
-          # Create deployment directory
-          echo "Creating deployment directory..."
-          mkdir -p /opt/apollo-search
+          # Clone the public repository
+          echo "Cloning repository..."
+          git clone https://github.com/The-Motor-Element/search_backend.git /opt/apollo-search
           cd /opt/apollo-search
           
-          # Create a simple working docker-compose.yml
-          echo "Creating Docker Compose configuration..."
-          cat > docker-compose.yml << 'EOF'
-          services:
-            meilisearch:
-              image: getmeili/meilisearch:latest
-              ports:
-                - "7700:7700"
-              environment:
-                - MEILI_MASTER_KEY=${MeiliMasterKey}
-                - MEILI_ENV=development
-                - MEILI_HTTP_ADDR=0.0.0.0:7700
-              volumes:
-                - meilisearch_data:/meili_data
-              restart: unless-stopped
-              healthcheck:
-                test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
-                interval: 30s
-                timeout: 10s
-                retries: 3
-                
-            web-ui:
-              image: nginx:alpine
-              ports:
-                - "8080:80"
-              volumes:
-                - ./html:/usr/share/nginx/html:ro
-              depends_on:
-                meilisearch:
-                  condition: service_healthy
-              restart: unless-stopped
-              
-          volumes:
-            meilisearch_data:
-          EOF
+          # Make scripts executable
+          chmod +x scripts/*.py || echo "No Python scripts to make executable"
           
-          # Create a simple HTML interface
-          echo "Creating web interface..."
-          mkdir -p html
-          cat > html/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>Apollo Search Backend - Demo</title>
-              <style>
+          # Build and start services
+          echo "Building and starting services..."
+          docker-compose up -d
+          
+          # Wait for services to initialize
+          echo "Waiting for services to initialize..."
+          sleep 60
                   body { font-family: Arial, sans-serif; margin: 40px; }
                   .container { max-width: 800px; margin: 0 auto; }
                   .status { padding: 20px; margin: 20px 0; border-radius: 5px; }
@@ -272,79 +237,20 @@ Resources:
                   
                   <div id="results"></div>
                   
-                  <h3>📋 Example API Usage</h3>
-                  <pre>
-          # Check MeiliSearch health
-          curl http://INSTANCE_IP:7700/health
+          # Load demo data
+          echo "Loading demo data..."
+          sleep 30  # Give services time to fully start
           
-          # Get MeiliSearch stats
-          curl http://INSTANCE_IP:7700/stats
-          
-          # Create an index
-          curl -X POST 'http://INSTANCE_IP:7700/indexes' \
-            -H 'Content-Type: application/json' \
-            -H 'Authorization: Bearer MEILI_MASTER_KEY' \
-            --data '{"uid": "products", "primaryKey": "id"}'
-          
-          # Add a document
-          curl -X POST 'http://INSTANCE_IP:7700/indexes/products/documents' \
-            -H 'Content-Type: application/json' \
-            -H 'Authorization: Bearer MEILI_MASTER_KEY' \
-            --data '[{"id": 1, "title": "Test Product", "category": "demo"}]'
-          
-          # Search
-          curl -X POST 'http://INSTANCE_IP:7700/indexes/products/search' \
-            -H 'Content-Type: application/json' \
-            -H 'Authorization: Bearer MEILI_MASTER_KEY' \
-            --data '{"q": "test"}'
-                  </pre>
-              </div>
-              
-              <script>
-                  const MEILISEARCH_URL = 'http://' + window.location.hostname + ':7700';
-                  const MASTER_KEY = 'MEILI_MASTER_KEY_PLACEHOLDER';
-                  
-                  function testMeilisearch() {
-                      fetch(MEILISEARCH_URL + '/health')
-                          .then(response => response.json())
-                          .then(data => {
-                              document.getElementById('results').innerHTML = 
-                                  '<div class="status success">✅ MeiliSearch Health: ' + JSON.stringify(data) + '</div>';
-                          })
-                          .catch(error => {
-                              document.getElementById('results').innerHTML = 
-                                  '<div class="status error">❌ Error: ' + error.message + '</div>';
-                          });
-                  }
-                  
-                  function createIndex() {
-                      fetch(MEILISEARCH_URL + '/indexes', {
-                          method: 'POST',
-                          headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': 'Bearer ' + MASTER_KEY
-                          },
-                          body: JSON.stringify({uid: 'demo', primaryKey: 'id'})
-                      })
-                      .then(response => response.json())
-                      .then(data => {
-                          document.getElementById('results').innerHTML = 
-                              '<div class="status success">✅ Index Created: ' + JSON.stringify(data) + '</div>';
-                      })
-                      .catch(error => {
-                          document.getElementById('results').innerHTML = 
-                              '<div class="status error">❌ Error: ' + error.message + '</div>';
-                      });
-                  }
-              </script>
-          </body>
-          </html>
-          EOF
-          
-          # Replace placeholders in the HTML
-          INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-          sed -i "s/INSTANCE_IP/$INSTANCE_IP/g" html/index.html
-          sed -i "s/MEILI_MASTER_KEY_PLACEHOLDER/${MeiliMasterKey}/g" html/index.html
+          # Check if data loading is available
+          if [ -f "scripts/load_apollo_data.py" ]; then
+            echo "Loading Apollo tire data..."
+            docker-compose exec -T api python scripts/load_apollo_data.py || echo "Could not load Apollo data - will continue"
+          elif [ -f "scripts/seed.py" ]; then
+            echo "Loading seed data..."
+            docker-compose exec -T api python scripts/seed.py || echo "Could not load seed data - will continue"
+          else
+            echo "No data loading script found - skipping data load"
+          fi
           
           # Create startup script
           echo "Creating startup script..."
@@ -354,8 +260,10 @@ Resources:
           echo "Starting Apollo Search Backend..."
           /usr/bin/docker-compose up -d
           echo "Apollo Search Backend started!"
-          echo "UI: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
-          echo "MeiliSearch: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):7700"
+          INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+          echo "UI: http://$INSTANCE_IP:8080"
+          echo "API: http://$INSTANCE_IP:8001/docs"
+          echo "MeiliSearch: http://$INSTANCE_IP:7700"
           EOF
           chmod +x start-apollo.sh
           
@@ -416,6 +324,7 @@ Resources:
           
           🌐 Access URLs:
           - UI: http://$INSTANCE_IP:8080
+          - API Docs: http://$INSTANCE_IP:8001/docs
           - MeiliSearch: http://$INSTANCE_IP:7700
           
           📋 Management Commands:
@@ -432,6 +341,12 @@ Resources:
           - View logs: sudo docker-compose -f /opt/apollo-search/docker-compose.yml logs -f
           - Restart services: cd /opt/apollo-search && sudo docker-compose restart
           
+          🔍 Apollo Tire Search:
+          - Search over 1500+ Apollo tire products
+          - Brand: Apollo (Premium tire manufacturer)
+          - Categories: Passenger Car, Two Wheeler, Commercial Vehicle
+          - Features: Size, speed rating, load index search
+          
           ⚠️  Note: This is a demo deployment on FREE TIER resources.
           EOF
           
@@ -440,6 +355,7 @@ Resources:
           echo "✅ Apollo Search Backend deployment completed successfully!"
           echo "Instance IP: $INSTANCE_IP"
           echo "UI URL: http://$INSTANCE_IP:8080"
+          echo "API URL: http://$INSTANCE_IP:8001/docs"
           echo "MeiliSearch URL: http://$INSTANCE_IP:7700"
           
       Tags:
