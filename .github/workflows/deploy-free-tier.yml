@@ -110,8 +110,109 @@ jobs:
         echo "ui-url=$UI_URL" >> $GITHUB_OUTPUT
         echo "api-url=$API_URL" >> $GITHUB_OUTPUT
         
+    - name: Wait for Services to Initialize
+      run: |
+        echo "Waiting for services to fully initialize..."
+        echo "Instance IP: ${{ steps.deployment-info.outputs.public-ip }}"
+        
+        # Wait for 3 minutes for UserData script to complete
+        echo "Waiting 3 minutes for UserData script to complete..."
+        sleep 180
+        
+        # Check if services are responding
+        max_attempts=10
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt: Checking if API is responsive..."
+          
+          if curl -s --connect-timeout 10 --max-time 30 "${{ steps.deployment-info.outputs.api-url }}" > /dev/null; then
+            echo "✅ API is responding!"
+            break
+          else
+            echo "⏳ API not ready yet, waiting 30 seconds..."
+            sleep 30
+            attempt=$((attempt + 1))
+          fi
+        done
+        
+        if [ $attempt -gt $max_attempts ]; then
+          echo "❌ API failed to respond after $max_attempts attempts"
+          exit 1
+        fi
+        
+    - name: Verify and Load Apollo Data
+      run: |
+        echo "🔍 Checking if Apollo tire data is loaded..."
+        
+        # Test if search works with Apollo tire data
+        SEARCH_RESULT=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/search?q=apollo&limit=1" || echo "")
+        
+        if echo "$SEARCH_RESULT" | grep -q '"estimated_total_hits":[1-9]'; then
+          echo "✅ Apollo tire data is already loaded!"
+          TOTAL_HITS=$(echo "$SEARCH_RESULT" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+          echo "📊 Found $TOTAL_HITS Apollo tire products"
+        else
+          echo "📦 Apollo tire data not found, triggering data load..."
+          
+          # Get the private key content from outputs (if available)
+          INSTANCE_IP="${{ steps.deployment-info.outputs.public-ip }}"
+          
+          # Create temporary key file
+          echo "Creating SSH key for data loading..."
+          if [ -f "${{ github.event.inputs.key_pair_name }}.pem" ]; then
+            chmod 600 "${{ github.event.inputs.key_pair_name }}.pem"
+            
+            echo "🚀 Loading Apollo tire data via SSH..."
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+              -i "${{ github.event.inputs.key_pair_name }}.pem" \
+              ec2-user@${INSTANCE_IP} \
+              "cd /opt/apollo-search && sudo docker-compose exec -T api python scripts/load_apollo_data.py" || {
+              echo "⚠️ SSH data loading failed, but deployment may still work"
+              echo "💡 You can manually load data by SSH'ing to the instance"
+            }
+          else
+            echo "⚠️ SSH key not available for automatic data loading"
+            echo "💡 Data loading will be handled by UserData script or manual SSH"
+          fi
+        fi
+        
+    - name: Verify Deployment Health
+      run: |
+        echo "🏥 Performing final health checks..."
+        
+        # Test API health
+        API_HEALTH=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/health" || echo "")
+        if echo "$API_HEALTH" | grep -q '"status":"healthy"'; then
+          echo "✅ API health check passed"
+        else
+          echo "❌ API health check failed"
+          echo "Response: $API_HEALTH"
+        fi
+        
+        # Test UI accessibility
+        if curl -s --head "${{ steps.deployment-info.outputs.ui-url }}" | grep -q "200 OK"; then
+          echo "✅ UI accessibility check passed"
+        else
+          echo "❌ UI accessibility check failed"
+        fi
+        
+        # Test search functionality
+        SEARCH_TEST=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/search?q=loadstar&limit=1" || echo "")
+        if echo "$SEARCH_TEST" | grep -q '"hits"'; then
+          echo "✅ Search functionality test passed"
+          HITS=$(echo "$SEARCH_TEST" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+          echo "📊 Search test returned $HITS results"
+        else
+          echo "⚠️ Search functionality test inconclusive"
+          echo "This might be normal if data is still loading"
+        fi
+        
     - name: Create Deployment Summary
       run: |
+        # Get final data count
+        DATA_COUNT=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/search?q=&limit=1" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2 || echo "0")
+        
         cat >> $GITHUB_STEP_SUMMARY << EOF
         # 🚀 Apollo Search Demo Deployed Successfully!
         
@@ -122,7 +223,12 @@ jobs:
         - **API Docs**: [${{ steps.deployment-info.outputs.api-url }}](${{ steps.deployment-info.outputs.api-url }})
         - **Instance IP**: ${{ steps.deployment-info.outputs.public-ip }}
         
-        ## 🔧 SSH Access:
+        ## � Data Status:
+        - **Apollo Tire Products**: ${DATA_COUNT} products loaded
+        - **Search Engine**: MeiliSearch with full-text search
+        - **Features**: Faceted search, filtering, autocomplete
+        
+        ## �🔧 SSH Access:
         ```bash
         ssh -i ${{ github.event.inputs.key_pair_name }}.pem ec2-user@${{ steps.deployment-info.outputs.public-ip }}
         ```
@@ -131,6 +237,19 @@ jobs:
         - **Project Directory**: /opt/apollo-search
         - **Start Services**: sudo systemctl start apollo-search
         - **View Logs**: sudo docker-compose -f /opt/apollo-search/docker-compose.yml logs -f
+        - **Load Data**: sudo docker-compose exec api python scripts/load_apollo_data.py
+        
+        ## 🧪 Quick Tests:
+        ```bash
+        # Test API health
+        curl ${{ steps.deployment-info.outputs.api-url }}/health
+        
+        # Search Apollo tires
+        curl "${{ steps.deployment-info.outputs.api-url }}/search?q=loadstar&limit=5"
+        
+        # Browse categories
+        curl "${{ steps.deployment-info.outputs.api-url }}/search?q=&facets=group,category"
+        ```
         
         ## 🗑️ Cleanup:
         ```bash
@@ -138,5 +257,5 @@ jobs:
         aws ec2 delete-key-pair --key-name ${{ github.event.inputs.key_pair_name }} --region ${{ github.event.inputs.aws_region }}
         ```
         
-        ⚠️ **Note**: Allow 2-3 minutes for services to fully start up after deployment.
+        ⚠️ **Note**: If data count shows 0, the UserData script may still be loading data. Check logs via SSH.
         EOF

@@ -55,11 +55,16 @@ create_key_pair() {
             --key-name $KEY_PAIR_NAME \
             --region $AWS_REGION \
             --query 'KeyMaterial' \
-            --output text > ${KEY_PAIR_NAME}.pem
+            --output text > ./${KEY_PAIR_NAME}.pem
         
-        chmod 400 ${KEY_PAIR_NAME}.pem
-        echo -e "${GREEN}✅ SSH key pair created: ${KEY_PAIR_NAME}.pem${NC}"
-        echo -e "${YELLOW}⚠️  Keep this file safe! You'll need it to SSH into your instance.${NC}"
+        if [ $? -eq 0 ]; then
+            chmod 400 ./${KEY_PAIR_NAME}.pem
+            echo -e "${GREEN}✅ SSH key pair created: ${KEY_PAIR_NAME}.pem${NC}"
+            echo -e "${YELLOW}⚠️  Keep this file safe! You'll need it to SSH into your instance.${NC}"
+        else
+            echo -e "${RED}❌ Failed to create SSH key pair${NC}"
+            exit 1
+        fi
     fi
 }
 
@@ -98,11 +103,10 @@ deploy_free_tier() {
         echo -e "${BLUE}📝 Updating existing stack...${NC}"
         aws cloudformation update-stack \
             --stack-name $STACK_NAME \
-            --template-body file://aws/cloudformation-free-tier.yml \
+            --template-body file://aws/cloudformation-free-tier-no-iam.yml \
             --parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME \
                         ParameterKey=MeiliMasterKey,ParameterValue=$MEILI_MASTER_KEY \
                         ParameterKey=KeyPairName,ParameterValue=$KEY_PAIR_NAME \
-            --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
         
         wait_for_stack $STACK_NAME "update"
@@ -110,11 +114,10 @@ deploy_free_tier() {
         echo -e "${BLUE}🆕 Creating new stack...${NC}"
         aws cloudformation create-stack \
             --stack-name $STACK_NAME \
-            --template-body file://aws/cloudformation-free-tier.yml \
+            --template-body file://aws/cloudformation-free-tier-no-iam.yml \
             --parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME \
                         ParameterKey=MeiliMasterKey,ParameterValue=$MEILI_MASTER_KEY \
                         ParameterKey=KeyPairName,ParameterValue=$KEY_PAIR_NAME \
-            --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
         
         wait_for_stack $STACK_NAME "create"
