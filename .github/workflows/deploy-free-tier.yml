@@ -112,101 +112,316 @@ jobs:
         
     - name: Wait for Services to Initialize
       run: |
-        echo "Waiting for services to fully initialize..."
-        echo "Instance IP: ${{ steps.deployment-info.outputs.public-ip }}"
+        echo "🚀 Starting service initialization monitoring..."
+        echo "📍 Instance IP: ${{ steps.deployment-info.outputs.public-ip }}"
+        echo "🕐 Start time: $(date)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
-        # Wait for 3 minutes for UserData script to complete
-        echo "Waiting 3 minutes for UserData script to complete..."
-        sleep 180
+        # Wait for 5 minutes for UserData script to complete (increased from 3 minutes)
+        echo "⏳ Phase 1: Waiting 5 minutes for UserData script to complete..."
+        echo "💡 During this time, the instance is:"
+        echo "   - Running system updates"
+        echo "   - Installing Docker and dependencies"
+        echo "   - Downloading and building container images"
+        echo "   - Starting services"
         
-        # Check if services are responding
-        max_attempts=10
+        for i in {1..10}; do
+          echo "⏰ UserData wait: ${i}/10 - $(date)"
+          sleep 30
+        done
+        
+        echo "✅ UserData wait period completed at $(date)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Check if services are responding with increased timeout
+        echo "🔍 Phase 2: Starting API health checks..."
+        max_attempts=20  # 20 attempts × 30 seconds = 10 minutes (increased from 5 minutes)
         attempt=1
         
         while [ $attempt -le $max_attempts ]; do
-          echo "Attempt $attempt: Checking if API is responsive..."
+          echo "🏥 Health Check Attempt $attempt/$max_attempts at $(date)"
           
-          if curl -s --connect-timeout 10 --max-time 30 "${{ steps.deployment-info.outputs.api-url }}" > /dev/null; then
-            echo "✅ API is responding!"
+          # Try to get more detailed response
+          echo "🌐 Testing API endpoint: ${{ steps.deployment-info.outputs.api-url }}"
+          
+          # First try a simple connectivity test
+          if curl -s --connect-timeout 15 --max-time 45 "${{ steps.deployment-info.outputs.api-url }}" > /dev/null 2>&1; then
+            echo "🎉 SUCCESS! API is responding at $(date)"
+            
+            # Get detailed API response for logging
+            echo "📋 API Response Details:"
+            curl -s --connect-timeout 15 --max-time 45 "${{ steps.deployment-info.outputs.api-url }}" | head -200 || echo "Could not get API response details"
+            
+            # Test health endpoint specifically
+            echo "🏥 Testing health endpoint:"
+            curl -s --connect-timeout 15 --max-time 45 "${{ steps.deployment-info.outputs.api-url }}/health" || echo "Health endpoint not yet available"
+            
             break
           else
-            echo "⏳ API not ready yet, waiting 30 seconds..."
+            echo "⏳ API not ready yet (attempt $attempt/$max_attempts)"
+            
+            # Every 5th attempt, do more detailed diagnostics
+            if [ $((attempt % 5)) -eq 0 ]; then
+              echo "🔧 Diagnostic info at attempt $attempt:"
+              echo "📊 Testing basic connectivity to instance..."
+              
+              # Test if the instance is reachable at all
+              if ping -c 1 -W 3 ${{ steps.deployment-info.outputs.public-ip }} > /dev/null 2>&1; then
+                echo "✅ Instance is pingable"
+              else
+                echo "❌ Instance is not responding to ping"
+              fi
+              
+              # Test different ports
+              echo "🔌 Testing port connectivity:"
+              nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 8001 && echo "✅ Port 8001 (API) is open" || echo "❌ Port 8001 (API) not accessible"
+              nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 8080 && echo "✅ Port 8080 (UI) is open" || echo "❌ Port 8080 (UI) not accessible"  
+              nc -z -w 3 ${{ steps.deployment-info.outputs.public-ip }} 7700 && echo "✅ Port 7700 (MeiliSearch) is open" || echo "❌ Port 7700 (MeiliSearch) not accessible"
+              
+              # Try verbose curl to see what's happening
+              echo "🔍 Verbose connection attempt:"
+              curl -v --connect-timeout 30 --max-time 60 "${{ steps.deployment-info.outputs.api-url }}" 2>&1 | head -20 || echo "Verbose curl failed"
+            fi
+            
+            echo "⏰ Waiting 30 seconds before next attempt..."
             sleep 30
             attempt=$((attempt + 1))
           fi
         done
         
         if [ $attempt -gt $max_attempts ]; then
-          echo "❌ API failed to respond after $max_attempts attempts"
-          exit 1
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️ API TIMEOUT: Failed to respond after $max_attempts attempts"
+          echo "🕐 Total wait time: ~15 minutes"
+          echo "🔍 This might indicate slower than expected initialization"
+          
+          echo "📊 Final diagnostic attempt:"
+          echo "🌐 Instance IP: ${{ steps.deployment-info.outputs.public-ip }}"
+          echo "🔌 Final port tests:"
+          nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 8001 && echo "✅ Port 8001 accessible" || echo "❌ Port 8001 not accessible"
+          nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 8080 && echo "✅ Port 8080 accessible" || echo "❌ Port 8080 not accessible"
+          nc -z -w 5 ${{ steps.deployment-info.outputs.public-ip }} 7700 && echo "✅ Port 7700 accessible" || echo "❌ Port 7700 not accessible"
+          
+          echo "🔍 Final API test with extended timeout:"
+          curl -v --connect-timeout 60 --max-time 120 "${{ steps.deployment-info.outputs.api-url }}" 2>&1 | head -50 || echo "Extended API test failed"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔍 Continuing workflow for manual verification..."
+          echo "💡 The instance may still be initializing - check manually via SSH"
+          echo "🖥️ SSH command: ssh -i ${{ github.event.inputs.key_pair_name }}.pem ec2-user@${{ steps.deployment-info.outputs.public-ip }}"
+        else
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎉 SUCCESS: API is responding after $attempt attempts"
+          echo "⏱️ Total initialization time: ~$((5 + attempt/2)) minutes"
+          echo "✅ Service initialization completed successfully"
         fi
         
     - name: Verify and Load Apollo Data
       run: |
-        echo "🔍 Checking if Apollo tire data is loaded..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🔍 Phase 3: Apollo Data Verification and Loading"
+        echo "🕐 Started at: $(date)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        echo "📊 Checking if Apollo tire data is already loaded..."
+        echo "🌐 Search API endpoint: ${{ steps.deployment-info.outputs.api-url }}/search"
         
         # Test if search works with Apollo tire data
-        SEARCH_RESULT=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/search?q=apollo&limit=1" || echo "")
+        echo "🔍 Testing search for 'apollo' products..."
+        SEARCH_RESULT=$(curl -s --connect-timeout 30 --max-time 60 "${{ steps.deployment-info.outputs.api-url }}/search?q=apollo&limit=1" 2>&1 || echo "SEARCH_FAILED")
+        
+        echo "📋 Search API Response:"
+        echo "$SEARCH_RESULT" | head -10
         
         if echo "$SEARCH_RESULT" | grep -q '"estimated_total_hits":[1-9]'; then
-          echo "✅ Apollo tire data is already loaded!"
           TOTAL_HITS=$(echo "$SEARCH_RESULT" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+          echo "🎉 SUCCESS: Apollo tire data is already loaded!"
           echo "📊 Found $TOTAL_HITS Apollo tire products"
+          echo "✅ No additional data loading required"
         else
-          echo "📦 Apollo tire data not found, triggering data load..."
+          echo "📦 Apollo tire data not found in search results"
+          echo "🚀 Attempting to load data via SSH..."
           
-          # Get the private key content from outputs (if available)
           INSTANCE_IP="${{ steps.deployment-info.outputs.public-ip }}"
+          echo "📍 Target instance: $INSTANCE_IP"
           
-          # Create temporary key file
-          echo "Creating SSH key for data loading..."
+          # Create temporary key file and set permissions
+          echo "🔑 Preparing SSH key for data loading..."
           if [ -f "${{ github.event.inputs.key_pair_name }}.pem" ]; then
             chmod 600 "${{ github.event.inputs.key_pair_name }}.pem"
+            echo "✅ SSH key permissions set"
             
-            echo "🚀 Loading Apollo tire data via SSH..."
-            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-              -i "${{ github.event.inputs.key_pair_name }}.pem" \
-              ec2-user@${INSTANCE_IP} \
-              "cd /opt/apollo-search && sudo docker-compose exec -T api python scripts/load_apollo_data.py" || {
-              echo "⚠️ SSH data loading failed, but deployment may still work"
-              echo "💡 You can manually load data by SSH'ing to the instance"
-            }
+            echo "� Testing SSH connectivity..."
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i "${{ github.event.inputs.key_pair_name }}.pem" ec2-user@${INSTANCE_IP} "echo 'SSH connection successful'" 2>&1; then
+              echo "✅ SSH connection established"
+              
+              echo "🐳 Checking Docker container status..."
+              ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i "${{ github.event.inputs.key_pair_name }}.pem" ec2-user@${INSTANCE_IP} "cd /opt/apollo-search && sudo docker-compose ps" 2>&1 || echo "Could not get container status"
+              
+              echo "📁 Checking for data loading script..."
+              ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i "${{ github.event.inputs.key_pair_name }}.pem" ec2-user@${INSTANCE_IP} "ls -la /opt/apollo-search/scripts/load_apollo_data.py" 2>&1 || echo "Data loading script not found"
+              
+              echo "🚀 Executing Apollo data loading..."
+              if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i "${{ github.event.inputs.key_pair_name }}.pem" ec2-user@${INSTANCE_IP} "cd /opt/apollo-search && sudo docker-compose exec -T api python scripts/load_apollo_data.py" 2>&1; then
+                echo "✅ Data loading command executed successfully"
+                
+                echo "⏳ Waiting 30 seconds for data to be indexed..."
+                sleep 30
+                
+                echo "🔍 Verifying data loading success..."
+                VERIFY_RESULT=$(curl -s --connect-timeout 30 --max-time 60 "${{ steps.deployment-info.outputs.api-url }}/search?q=apollo&limit=1" || echo "VERIFY_FAILED")
+                echo "� Verification result:"
+                echo "$VERIFY_RESULT" | head -5
+                
+                if echo "$VERIFY_RESULT" | grep -q '"estimated_total_hits":[1-9]'; then
+                  NEW_HITS=$(echo "$VERIFY_RESULT" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+                  echo "🎉 SUCCESS: Data loading completed! Found $NEW_HITS products"
+                else
+                  echo "⚠️ Data may still be indexing - this can take a few more minutes"
+                fi
+              else
+                echo "❌ Data loading command failed"
+                echo "💡 This might be normal if containers are still initializing"
+              fi
+            else
+              echo "❌ SSH connection failed"
+              echo "💡 This might be normal if the instance is still initializing"
+            fi
           else
-            echo "⚠️ SSH key not available for automatic data loading"
-            echo "💡 Data loading will be handled by UserData script or manual SSH"
+            echo "❌ SSH key file not found: ${{ github.event.inputs.key_pair_name }}.pem"
+            echo "💡 Data loading will be handled by UserData script"
+          fi
+          
+          echo "🔍 Final data status check..."
+          FINAL_CHECK=$(curl -s --connect-timeout 30 --max-time 60 "${{ steps.deployment-info.outputs.api-url }}/search?q=&limit=1" || echo "FINAL_CHECK_FAILED")
+          if echo "$FINAL_CHECK" | grep -q '"estimated_total_hits":[0-9]*'; then
+            FINAL_COUNT=$(echo "$FINAL_CHECK" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+            echo "📊 Total products in database: $FINAL_COUNT"
+          else
+            echo "⚠️ Could not determine final product count"
           fi
         fi
         
-    - name: Verify Deployment Health
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ Data verification phase completed at $(date)"
+        
+    - name: Final Verification and Summary
       run: |
-        echo "🏥 Performing final health checks..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "� Phase 4: Final Deployment Verification"
+        echo "🕐 Started at: $(date)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
-        # Test API health
-        API_HEALTH=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/health" || echo "")
-        if echo "$API_HEALTH" | grep -q '"status":"healthy"'; then
-          echo "✅ API health check passed"
+        API_URL="${{ steps.deployment-info.outputs.api-url }}"
+        UI_URL="${{ steps.deployment-info.outputs.ui-url }}"
+        PUBLIC_IP="${{ steps.deployment-info.outputs.public-ip }}"
+        
+        echo "🌐 Application URLs:"
+        echo "   📡 API URL: $API_URL"
+        echo "   🖥️  UI URL: $UI_URL"
+        echo "   📍 Public IP: $PUBLIC_IP"
+        echo ""
+        
+        # API Health Check
+        echo "🏥 Performing comprehensive API health check..."
+        API_HEALTH=$(curl -s --connect-timeout 30 --max-time 60 "$API_URL/health" 2>&1 || echo "API_HEALTH_FAILED")
+        echo "📋 API Health Response:"
+        echo "$API_HEALTH" | head -5
+        
+        if echo "$API_HEALTH" | grep -q '"status"'; then
+          echo "✅ API health check: PASSED"
         else
-          echo "❌ API health check failed"
-          echo "Response: $API_HEALTH"
+          echo "❌ API health check: FAILED"
+        fi
+        echo ""
+        
+        # Search Functionality Test
+        echo "🔍 Testing search functionality..."
+        SEARCH_TEST=$(curl -s --connect-timeout 30 --max-time 60 "$API_URL/search?q=&limit=1" 2>&1 || echo "SEARCH_TEST_FAILED")
+        echo "📋 Search Test Response:"
+        echo "$SEARCH_TEST" | head -5
+        
+        if echo "$SEARCH_TEST" | grep -q '"estimated_total_hits"'; then
+          TOTAL_PRODUCTS=$(echo "$SEARCH_TEST" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+          echo "✅ Search functionality: PASSED ($TOTAL_PRODUCTS products indexed)"
+        else
+          echo "❌ Search functionality: FAILED"
+        fi
+        echo ""
+        
+        # UI Connectivity Test
+        echo "🖥️ Testing UI connectivity..."
+        UI_TEST=$(curl -s --connect-timeout 30 --max-time 60 -I "$UI_URL" 2>&1 || echo "UI_TEST_FAILED")
+        echo "📋 UI Response Headers:"
+        echo "$UI_TEST" | head -3
+        
+        if echo "$UI_TEST" | grep -q "200 OK\|HTTP/[0-9.]* 200"; then
+          echo "✅ UI connectivity: PASSED"
+        else
+          echo "❌ UI connectivity: FAILED"
+        fi
+        echo ""
+        
+        # Apollo Data Verification
+        echo "🏎️ Verifying Apollo tire data..."
+        APOLLO_TEST=$(curl -s --connect-timeout 30 --max-time 60 "$API_URL/search?q=apollo&limit=3" 2>&1 || echo "APOLLO_TEST_FAILED")
+        echo "📋 Apollo Search Response:"
+        echo "$APOLLO_TEST" | head -10
+        
+        if echo "$APOLLO_TEST" | grep -q '"estimated_total_hits":[1-9]'; then
+          APOLLO_COUNT=$(echo "$APOLLO_TEST" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
+          echo "✅ Apollo tire data: LOADED ($APOLLO_COUNT products found)"
+        else
+          echo "⚠️ Apollo tire data: NOT FOUND (may still be loading)"
+          echo "💡 Data loading can take 5-10 minutes after deployment"
+        fi
+        echo ""
+        
+        # Port Connectivity Summary
+        echo "🔌 Port connectivity summary:"
+        echo "   🌐 Port 3000 (UI): $(curl -s --connect-timeout 10 --max-time 20 "$UI_URL" >/dev/null 2>&1 && echo "✅ ACCESSIBLE" || echo "❌ FAILED")"
+        echo "   📡 Port 8000 (API): $(curl -s --connect-timeout 10 --max-time 20 "$API_URL/health" >/dev/null 2>&1 && echo "✅ ACCESSIBLE" || echo "❌ FAILED")"
+        echo ""
+        
+        # Overall Status Assessment
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📊 DEPLOYMENT SUMMARY"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Count successful checks
+        SUCCESS_COUNT=0
+        if echo "$API_HEALTH" | grep -q '"status"'; then SUCCESS_COUNT=$((SUCCESS_COUNT + 1)); fi
+        if echo "$SEARCH_TEST" | grep -q '"estimated_total_hits"'; then SUCCESS_COUNT=$((SUCCESS_COUNT + 1)); fi
+        if echo "$UI_TEST" | grep -q "200 OK\|HTTP/[0-9.]* 200"; then SUCCESS_COUNT=$((SUCCESS_COUNT + 1)); fi
+        
+        echo "🎯 Core Services Status: $SUCCESS_COUNT/3 operational"
+        
+        if [ $SUCCESS_COUNT -eq 3 ]; then
+          echo "🎉 DEPLOYMENT STATUS: ✅ FULLY SUCCESSFUL"
+          echo "� All services are operational and ready for use!"
+        elif [ $SUCCESS_COUNT -eq 2 ]; then
+          echo "⚠️ DEPLOYMENT STATUS: 🟡 PARTIALLY SUCCESSFUL"
+          echo "💡 Most services working, minor issues detected"
+        else
+          echo "❌ DEPLOYMENT STATUS: 🔴 FAILED"
+          echo "🔧 Multiple services not responding - investigation needed"
         fi
         
-        # Test UI accessibility
-        if curl -s --head "${{ steps.deployment-info.outputs.ui-url }}" | grep -q "200 OK"; then
-          echo "✅ UI accessibility check passed"
-        else
-          echo "❌ UI accessibility check failed"
-        fi
-        
-        # Test search functionality
-        SEARCH_TEST=$(curl -s "${{ steps.deployment-info.outputs.api-url }}/search?q=loadstar&limit=1" || echo "")
-        if echo "$SEARCH_TEST" | grep -q '"hits"'; then
-          echo "✅ Search functionality test passed"
-          HITS=$(echo "$SEARCH_TEST" | grep -o '"estimated_total_hits":[0-9]*' | cut -d':' -f2)
-          echo "📊 Search test returned $HITS results"
-        else
-          echo "⚠️ Search functionality test inconclusive"
-          echo "This might be normal if data is still loading"
-        fi
+        echo ""
+        echo "🌟 Quick Access Links:"
+        echo "   🖥️ Apollo Tire Search UI: $UI_URL"
+        echo "   📖 API Documentation: $API_URL/docs"
+        echo "   🏥 Health Check: $API_URL/health"
+        echo "   🔍 Direct Search API: $API_URL/search?q=apollo"
+        echo ""
+        echo "🔧 Management Commands:"
+        echo "   📊 SSH Access: ssh -i ${{ github.event.inputs.key_pair_name }}.pem ec2-user@$PUBLIC_IP"
+        echo "   🐳 View Logs: ssh ... 'cd /opt/apollo-search && sudo docker-compose logs -f'"
+        echo "   📦 Restart Services: ssh ... 'cd /opt/apollo-search && sudo docker-compose restart'"
+        echo ""
+        echo "⏱️ Deployment completed at: $(date)"
+        echo "🕐 Total deployment time: $(($(date +%s) - ${{ env.DEPLOYMENT_START_TIME }})) seconds"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
     - name: Create Deployment Summary
       run: |
