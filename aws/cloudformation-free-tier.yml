@@ -1,6 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Apollo Search Backend - FREE TIER Demo Deployment'
 
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0e95a5e2743ec9ec9
+    us-west-2:
+      AMI: ami-0bbc328167dee8f3c
+    eu-west-1:
+      AMI: ami-0c1b135a30f3c8aa7
+    ap-southeast-1:
+      AMI: ami-0c802847a7dd848c0
+
 Parameters:
   ProjectName:
     Type: String
@@ -158,7 +169,7 @@ Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI (us-east-1)
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: t2.micro  # Free Tier eligible
       KeyName: !Ref KeyPairName
       IamInstanceProfile: !Ref EC2InstanceProfile
@@ -194,7 +205,10 @@ Resources:
           mkdir -p /opt/apollo-search
           cd /opt/apollo-search
           
-          # Create docker-compose file for demo
+          # Clone the repository
+          git clone https://github.com/The-Motor-Element/search_backend.git .
+          
+          # Create docker-compose file for demo (using local build)
           cat > docker-compose.yml << 'EOF'
           version: '3.8'
           services:
@@ -211,7 +225,9 @@ Resources:
               restart: unless-stopped
               
             api:
-              image: ghcr.io/the-motor-element/apollo-search-api:latest
+              build:
+                context: .
+                dockerfile: Dockerfile.api
               ports:
                 - "8001:8001"
               environment:
@@ -223,7 +239,9 @@ Resources:
               restart: unless-stopped
               
             ui:
-              image: ghcr.io/the-motor-element/apollo-search-ui:latest
+              build:
+                context: .
+                dockerfile: Dockerfile.ui
               ports:
                 - "8080:8080"
               environment:
@@ -241,7 +259,8 @@ Resources:
           cat > start-apollo.sh << 'EOF'
           #!/bin/bash
           cd /opt/apollo-search
-          /usr/bin/docker-compose up -d
+          echo "Building and starting Apollo Search Backend..."
+          /usr/bin/docker-compose up --build -d
           echo "Apollo Search Backend started!"
           echo "UI: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
           echo "API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8001/docs"
@@ -259,9 +278,9 @@ Resources:
           Type=oneshot
           RemainAfterExit=yes
           WorkingDirectory=/opt/apollo-search
-          ExecStart=/usr/bin/docker-compose up -d
+          ExecStart=/usr/bin/docker-compose up --build -d
           ExecStop=/usr/bin/docker-compose down
-          TimeoutStartSec=0
+          TimeoutStartSec=600
           
           [Install]
           WantedBy=multi-user.target
@@ -294,6 +313,15 @@ Resources:
           # Wait for Docker to be ready and start services
           sleep 30
           systemctl start apollo-search.service
+          
+          # Wait for services to be ready and load demo data
+          sleep 60
+          echo "Loading demo data..."
+          if [ -f "/opt/apollo-search/data/apollo-parsed.tsv" ]; then
+            docker-compose exec -T api python scripts/load_apollo_data.py
+          else
+            docker-compose exec -T api python scripts/seed.py
+          fi
           
           # Create welcome message
           cat > /home/ec2-user/README.txt << 'EOF'

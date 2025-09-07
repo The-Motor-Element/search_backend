@@ -50,7 +50,14 @@ jobs:
     - name: Deploy Free Tier Stack
       run: |
         MEILI_MASTER_KEY="demo-$(openssl rand -hex 12)"
+        echo "Generated MEILI_MASTER_KEY: $MEILI_MASTER_KEY"
         
+        echo "Validating CloudFormation template..."
+        aws cloudformation validate-template \
+          --template-body file://aws/cloudformation-free-tier.yml \
+          --region ${{ github.event.inputs.aws_region }}
+        
+        echo "Deploying CloudFormation stack..."
         aws cloudformation deploy \
           --template-file aws/cloudformation-free-tier.yml \
           --stack-name apollo-search-demo-free-tier \
@@ -59,7 +66,25 @@ jobs:
             MeiliMasterKey=$MEILI_MASTER_KEY \
             KeyPairName=${{ github.event.inputs.key_pair_name }} \
           --capabilities CAPABILITY_NAMED_IAM \
-          --region ${{ github.event.inputs.aws_region }}
+          --region ${{ github.event.inputs.aws_region }} \
+          --no-fail-on-empty-changeset
+          
+    - name: Handle Deployment Failure
+      if: failure()
+      run: |
+        echo "Deployment failed. Getting stack events..."
+        aws cloudformation describe-stack-events \
+          --stack-name apollo-search-demo-free-tier \
+          --region ${{ github.event.inputs.aws_region }} \
+          --query "StackEvents[?ResourceStatus=='CREATE_FAILED' || ResourceStatus=='UPDATE_FAILED'].{Time:Timestamp,Status:ResourceStatus,Reason:ResourceStatusReason,Resource:LogicalResourceId}" \
+          --output table || echo "Could not retrieve stack events"
+          
+        echo "Getting stack status..."
+        aws cloudformation describe-stacks \
+          --stack-name apollo-search-demo-free-tier \
+          --region ${{ github.event.inputs.aws_region }} \
+          --query "Stacks[0].StackStatus" \
+          --output text || echo "Could not retrieve stack status"
           
     - name: Get Deployment Info
       id: deployment-info
