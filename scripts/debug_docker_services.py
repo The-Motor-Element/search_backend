@@ -103,19 +103,30 @@ def main():
     
     # Test connectivity
     print("\n🔗 Quick Connectivity Test:")
-    import requests
     
     # Test Meilisearch
     try:
-        resp = requests.get("http://localhost:7700/health", timeout=5)
-        print(f"  Meilisearch: ✅ {resp.status_code}")
+        result = subprocess.run(
+            ["curl", "-f", "-s", "http://localhost:7700/health"], 
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            print(f"  Meilisearch: ✅ Connected")
+        else:
+            print(f"  Meilisearch: ❌ Failed (curl exit code: {result.returncode})")
     except Exception as e:
         print(f"  Meilisearch: ❌ {e}")
     
     # Test API  
     try:
-        resp = requests.get("http://localhost:8001/health", timeout=5)
-        print(f"  API: ✅ {resp.status_code}")
+        result = subprocess.run(
+            ["curl", "-f", "-s", "http://localhost:8001/health"], 
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            print(f"  API: ✅ Connected")
+        else:
+            print(f"  API: ❌ Failed (curl exit code: {result.returncode})")
     except Exception as e:
         print(f"  API: ❌ {e}")
 

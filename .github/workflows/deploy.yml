@@ -40,6 +40,8 @@ jobs:
       env:
         MEILI_MASTER_KEY: test_key_for_ci
         MEILI_ENV: development
+        API_BASE_URL: http://localhost:8001
+        MEILI_URL: http://localhost:7700
       run: |
         # Start services in detached mode
         docker compose up -d
@@ -88,7 +90,10 @@ jobs:
         MEILI_URL: http://localhost:7700
         MEILI_MASTER_KEY: test_key_for_ci
       run: |
-        # Run simple connectivity tests first
+        # Run ultra-simple connectivity test first (no dependencies)
+        python tests/test_ultra_simple.py
+        
+        # Then run more comprehensive tests
         python tests/test_simple_health.py
         
     - name: Run tests
