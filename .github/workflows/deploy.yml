@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Deploy to AWS
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     
     steps:
@@ -35,15 +35,50 @@ jobs:
     - name: Run tests
       run: |
         python -m pytest tests/ -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
         
-    - name: Install Vercel CLI
-      run: npm i -g vercel@latest
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
       
-    - name: Pull Vercel Environment Information
-      run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Build Project Artifacts
-      run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Deploy Project Artifacts to Vercel
-      run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+    - name: Build, tag, and push API image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY_API: apollo-search-api
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile.api -t $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
+        
+    - name: Build, tag, and push UI image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY_UI: apollo-search-ui
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile.ui -t $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_UI:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_UI:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_UI:latest
+        
+    - name: Deploy to ECS
+      run: |
+        aws ecs update-service --cluster apollo-search-cluster --service apollo-search-api-service --force-new-deployment
+        aws ecs update-service --cluster apollo-search-cluster --service apollo-search-ui-service --force-new-deployment

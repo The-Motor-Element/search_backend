@@ -140,3 +140,24 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+server.log
+ui_server.log
+
+# AWS deployment files
+*.pem
+.aws/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Editor files
+*~
+*.swp
+*.swo

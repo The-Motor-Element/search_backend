@@ -1,0 +1,118 @@
+name: Deploy Demo to AWS Free Tier
+
+on:
+  workflow_dispatch:
+    inputs:
+      key_pair_name:
+        description: 'SSH Key Pair Name'
+        required: true
+        default: 'apollo-demo-key'
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        default: 'us-east-1'
+        type: choice
+        options:
+        - us-east-1
+        - us-west-2
+        - eu-west-1
+        - ap-southeast-1
+
+jobs:
+  deploy-demo:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ github.event.inputs.aws_region }}
+        
+    - name: Create SSH Key Pair if needed
+      run: |
+        if ! aws ec2 describe-key-pairs --key-names ${{ github.event.inputs.key_pair_name }} --region ${{ github.event.inputs.aws_region }} 2>/dev/null; then
+          echo "Creating SSH key pair..."
+          aws ec2 create-key-pair \
+            --key-name ${{ github.event.inputs.key_pair_name }} \
+            --region ${{ github.event.inputs.aws_region }} \
+            --query 'KeyMaterial' \
+            --output text > ${{ github.event.inputs.key_pair_name }}.pem
+          echo "SSH key created: ${{ github.event.inputs.key_pair_name }}.pem"
+        else
+          echo "SSH key pair already exists"
+        fi
+        
+    - name: Deploy Free Tier Stack
+      run: |
+        MEILI_MASTER_KEY="demo-$(openssl rand -hex 12)"
+        
+        aws cloudformation deploy \
+          --template-file aws/cloudformation-free-tier.yml \
+          --stack-name apollo-search-demo-free-tier \
+          --parameter-overrides \
+            ProjectName=apollo-search-demo \
+            MeiliMasterKey=$MEILI_MASTER_KEY \
+            KeyPairName=${{ github.event.inputs.key_pair_name }} \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Get Deployment Info
+      id: deployment-info
+      run: |
+        PUBLIC_IP=$(aws cloudformation describe-stacks \
+          --stack-name apollo-search-demo-free-tier \
+          --region ${{ github.event.inputs.aws_region }} \
+          --query "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" \
+          --output text)
+        
+        UI_URL=$(aws cloudformation describe-stacks \
+          --stack-name apollo-search-demo-free-tier \
+          --region ${{ github.event.inputs.aws_region }} \
+          --query "Stacks[0].Outputs[?OutputKey=='UIUrl'].OutputValue" \
+          --output text)
+        
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name apollo-search-demo-free-tier \
+          --region ${{ github.event.inputs.aws_region }} \
+          --query "Stacks[0].Outputs[?OutputKey=='APIUrl'].OutputValue" \
+          --output text)
+        
+        echo "public-ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+        echo "ui-url=$UI_URL" >> $GITHUB_OUTPUT
+        echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+        
+    - name: Create Deployment Summary
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        # 🚀 Apollo Search Demo Deployed Successfully!
+        
+        ## 💰 Cost: \$0.00 (AWS Free Tier)
+        
+        ## 🌐 Access URLs:
+        - **Search UI**: [${{ steps.deployment-info.outputs.ui-url }}](${{ steps.deployment-info.outputs.ui-url }})
+        - **API Docs**: [${{ steps.deployment-info.outputs.api-url }}](${{ steps.deployment-info.outputs.api-url }})
+        - **Instance IP**: ${{ steps.deployment-info.outputs.public-ip }}
+        
+        ## 🔧 SSH Access:
+        ```bash
+        ssh -i ${{ github.event.inputs.key_pair_name }}.pem ec2-user@${{ steps.deployment-info.outputs.public-ip }}
+        ```
+        
+        ## 📁 Management:
+        - **Project Directory**: /opt/apollo-search
+        - **Start Services**: sudo systemctl start apollo-search
+        - **View Logs**: sudo docker-compose -f /opt/apollo-search/docker-compose.yml logs -f
+        
+        ## 🗑️ Cleanup:
+        ```bash
+        aws cloudformation delete-stack --stack-name apollo-search-demo-free-tier --region ${{ github.event.inputs.aws_region }}
+        aws ec2 delete-key-pair --key-name ${{ github.event.inputs.key_pair_name }} --region ${{ github.event.inputs.aws_region }}
+        ```
+        
+        ⚠️ **Note**: Allow 2-3 minutes for services to fully start up after deployment.
+        EOF

@@ -1,0 +1,69 @@
+{
+  "family": "meilisearch",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "meilisearch",
+      "image": "getmeili/meilisearch:latest",
+      "portMappings": [
+        {
+          "containerPort": 7700,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "MEILI_MASTER_KEY",
+          "value": "{{MEILI_MASTER_KEY}}"
+        },
+        {
+          "name": "MEILI_ENV",
+          "value": "production"
+        },
+        {
+          "name": "MEILI_HTTP_ADDR",
+          "value": "0.0.0.0:7700"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "meilisearch-data",
+          "containerPath": "/meili_data"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/meilisearch",
+          "awslogs-region": "{{AWS_REGION}}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:7700/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "meilisearch-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "{{EFS_FILE_SYSTEM_ID}}",
+        "rootDirectory": "/meilisearch"
+      }
+    }
+  ]
+}

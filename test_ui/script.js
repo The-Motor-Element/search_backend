@@ -1,8 +1,7 @@
 // Apollo Tire Search UI JavaScript
 
-// Get API URL from window configuration or detect environment
-const API_BASE_URL = window.APOLLO_API_URL || 
-    (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '/api');
+// Get API URL from window configuration or default to localhost
+const API_BASE_URL = window.APOLLO_API_URL || 'http://localhost:8001';
 let currentPage = 0;
 let currentQuery = '';
 let currentFilters = '';
