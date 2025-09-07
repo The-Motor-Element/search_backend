@@ -6,6 +6,7 @@ let currentPage = 0;
 let currentQuery = '';
 let currentFilters = '';
 let similarProductsCache = {};
+let selectedFacets = {}; // Track selected facets
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -170,6 +171,30 @@ function setupEventListeners() {
         const element = document.getElementById(id);
         if (element) {
             element.addEventListener('change', () => {
+                // Sync selected facets when dropdowns change
+                if (id === 'groupFilter') {
+                    if (element.value) {
+                        selectedFacets['group'] = element.value;
+                    } else {
+                        delete selectedFacets['group'];
+                    }
+                } else if (id === 'recordTypeFilter') {
+                    if (element.value) {
+                        selectedFacets['record_type'] = element.value;
+                    } else {
+                        delete selectedFacets['record_type'];
+                    }
+                } else if (id === 'plyRatingFilter') {
+                    if (element.value) {
+                        selectedFacets['ply_rating'] = element.value;
+                    } else {
+                        delete selectedFacets['ply_rating'];
+                    }
+                }
+                
+                // Update selected facets display
+                updateSelectedFacetsDisplay();
+                
                 if (currentQuery || getCurrentFilters()) {
                     performSearch();
                 }
@@ -655,6 +680,9 @@ function displayFacets(facetDistribution) {
 }
 
 function applyFacetFilter(facetName, value) {
+    // Add to selected facets
+    selectedFacets[facetName] = value;
+    
     // Update the appropriate filter select
     const filterMap = {
         'group': 'groupFilter',
@@ -665,8 +693,96 @@ function applyFacetFilter(facetName, value) {
     const selectId = filterMap[facetName];
     if (selectId) {
         document.getElementById(selectId).value = value;
-        performSearch();
     }
+    
+    // Update selected facets display
+    updateSelectedFacetsDisplay();
+    
+    // Perform search
+    performSearch();
+}
+
+// Add selected facets management functions
+function updateSelectedFacetsDisplay() {
+    const container = document.getElementById('selectedFacetsContainer');
+    const tagsContainer = document.getElementById('selectedFacetsTags');
+    
+    if (Object.keys(selectedFacets).length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    const tags = Object.entries(selectedFacets).map(([facetName, value]) => {
+        const displayName = facetName.replace('_', ' ').toUpperCase();
+        return `
+            <div class="selected-facet-tag">
+                <span class="selected-facet-label">${displayName}:</span>
+                <span class="selected-facet-value">${value}</span>
+                <button class="remove-facet" onclick="removeFacetFilter('${facetName}')" title="Remove filter">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+    
+    tagsContainer.innerHTML = tags;
+}
+
+function removeFacetFilter(facetName) {
+    console.log('Removing facet:', facetName);
+    console.log('Before removal:', selectedFacets);
+    
+    // Remove from selected facets
+    delete selectedFacets[facetName];
+    
+    console.log('After removal:', selectedFacets);
+    
+    // Clear the corresponding filter select
+    const filterMap = {
+        'group': 'groupFilter',
+        'record_type': 'recordTypeFilter', 
+        'ply_rating': 'plyRatingFilter'
+    };
+    
+    const selectId = filterMap[facetName];
+    if (selectId) {
+        const selectElement = document.getElementById(selectId);
+        if (selectElement) {
+            selectElement.value = '';
+            console.log('Cleared dropdown:', selectId);
+        }
+    }
+    
+    // Update display
+    updateSelectedFacetsDisplay();
+    
+    // Perform search
+    performSearch();
+}
+
+function clearAllFilters() {
+    console.log('Clearing all filters');
+    console.log('Before clear:', selectedFacets);
+    
+    // Clear selected facets
+    selectedFacets = {};
+    
+    // Clear all filter selects
+    document.getElementById('groupFilter').value = '';
+    document.getElementById('recordTypeFilter').value = '';
+    document.getElementById('plyRatingFilter').value = '';
+    document.getElementById('customFilter').value = '';
+    
+    console.log('After clear:', selectedFacets);
+    console.log('Cleared all dropdowns');
+    
+    // Update display
+    updateSelectedFacetsDisplay();
+    
+    // Perform search
+    performSearch();
 }
 
 async function loadSimilarProducts(productId) {
@@ -773,10 +889,23 @@ function loadSampleSearch(query) {
 
 function browseMode() {
     console.log('🔍 Entering browse mode');
+    
+    // Clear search query to show all results
     document.getElementById('searchQuery').value = '';
+    
+    // Set to browse mode
     document.getElementById('searchType').value = 'browse';
-    document.getElementById('limitSelect').value = '0';
+    
+    // Set to show all results for browsing
+    document.getElementById('limitSelect').value = '1000';
+    
+    // Clear all filters for a full browse experience
+    clearAllFilters();
+    
+    // Update the interface to show facets panel
     updateSearchInterface();
+    
+    // Perform the search to show all categories
     performSearch();
 }
 

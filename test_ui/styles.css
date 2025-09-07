@@ -530,3 +530,68 @@ body {
     font-size: 0.9rem;
     margin-top: 10px;
 }
+
+/* Selected Facets Container */
+.selected-facets-container {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+/* Selected Facets Styling */
+.selected-facet-tag {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.selected-facet-tag:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.selected-facet-tag .remove-facet {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 0;
+    line-height: 1;
+}
+
+.selected-facet-tag .remove-facet:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.selected-facet-label {
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.selected-facet-value {
+    font-weight: 300;
+    opacity: 0.9;
+}
+
+#selectedFacetsContainer .card {
+    border: 1px solid #e3f2fd;
+    background-color: #fafafa;
+}

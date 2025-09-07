@@ -11,7 +11,6 @@ services:
       - MEILI_HTTP_ADDR=0.0.0.0:7700
     volumes:
       - meilisearch_data:/meili_data
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
       interval: 30s
@@ -33,7 +32,6 @@ services:
     depends_on:
       meilisearch:
         condition: service_healthy
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
@@ -54,7 +52,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 30s
