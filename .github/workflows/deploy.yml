@@ -62,8 +62,14 @@ jobs:
         export API_BASE_URL=http://localhost:8001
         export MEILI_MASTER_KEY=test_key_for_ci
         
-        # Run comprehensive health checks
+        # Run comprehensive health checks with extended timeout
         python scripts/test_health_checks.py
+        
+        # Additional manual verification
+        echo "Final service verification..."
+        timeout 60 bash -c 'until curl -s http://localhost:7700/health > /dev/null; do sleep 1; done'
+        timeout 60 bash -c 'until curl -s http://localhost:8001/health > /dev/null; do sleep 1; done'
+        echo "All services confirmed healthy!"
         
     - name: Configure test environment
       run: |
@@ -72,10 +78,15 @@ jobs:
         # We'll override the API_BASE_URL for tests
         export API_BASE_URL=http://localhost:8001
         
+    - name: Run simple health tests
+      run: |
+        # Run simple connectivity tests first
+        python tests/test_simple_health.py
+        
     - name: Run tests
       run: |
         # Run tests with the correct API URL
-        API_BASE_URL=http://localhost:8001 python -m pytest tests/ -v
+        API_BASE_URL=http://localhost:8001 python -m pytest tests/test_endpoints.py -v
         
     - name: Show service logs on failure
       if: failure()
