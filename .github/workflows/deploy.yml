@@ -37,30 +37,41 @@ jobs:
         python scripts/test_docker_compose.py
         
     - name: Start services with Docker Compose
+      env:
+        MEILI_MASTER_KEY: test_key_for_ci
+        MEILI_ENV: development
       run: |
-        # Set environment variables for testing
-        export MEILI_MASTER_KEY=test_key_for_ci
-        export MEILI_ENV=development
-        
         # Start services in detached mode
         docker compose up -d
+        
+        # Wait a bit for services to initialize
+        echo "Waiting for services to initialize..."
+        sleep 10
         
         # Show running containers and ports
         echo "Docker containers status:"
         docker compose ps
         
+        # Show detailed port mappings
+        echo "Port mappings:"
+        docker compose port api 8001 || echo "API port mapping not found"
+        docker compose port meilisearch 7700 || echo "Meilisearch port mapping not found"
+        
+        # Debug service status
+        echo "Detailed service debug:"
+        python scripts/debug_docker_services.py
+        
         # Validate port configuration
         python scripts/validate_docker_ports.py
         
     - name: Wait for services to be healthy
+      env:
+        MEILI_URL: http://localhost:7700
+        API_BASE_URL: http://localhost:8001
+        MEILI_MASTER_KEY: test_key_for_ci
       run: |
         # Install requests for health check script
         pip install requests
-        
-        # Set environment variables for health checks
-        export MEILI_URL=http://localhost:7700
-        export API_BASE_URL=http://localhost:8001
-        export MEILI_MASTER_KEY=test_key_for_ci
         
         # Run comprehensive health checks with extended timeout
         python scripts/test_health_checks.py
@@ -71,22 +82,23 @@ jobs:
         timeout 60 bash -c 'until curl -s http://localhost:8001/health > /dev/null; do sleep 1; done'
         echo "All services confirmed healthy!"
         
-    - name: Configure test environment
-      run: |
-        # Create a symlink or update test configuration to use the correct port
-        # Since Docker Compose maps API to port 8001, but tests expect 8000
-        # We'll override the API_BASE_URL for tests
-        export API_BASE_URL=http://localhost:8001
-        
     - name: Run simple health tests
+      env:
+        API_BASE_URL: http://localhost:8001
+        MEILI_URL: http://localhost:7700
+        MEILI_MASTER_KEY: test_key_for_ci
       run: |
         # Run simple connectivity tests first
         python tests/test_simple_health.py
         
     - name: Run tests
+      env:
+        API_BASE_URL: http://localhost:8001
+        MEILI_URL: http://localhost:7700
+        MEILI_MASTER_KEY: test_key_for_ci
       run: |
         # Run tests with the correct API URL
-        API_BASE_URL=http://localhost:8001 python -m pytest tests/test_endpoints.py -v
+        python -m pytest tests/test_endpoints.py -v
         
     - name: Show service logs on failure
       if: failure()

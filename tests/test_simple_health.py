@@ -84,6 +84,10 @@ if __name__ == "__main__":
     print(f"🧪 Testing services:")
     print(f"   Meilisearch: {MEILI_URL}")
     print(f"   API: {API_BASE_URL}")
+    print(f"   Environment variables:")
+    print(f"     - API_BASE_URL: {os.getenv('API_BASE_URL', 'NOT SET')}")
+    print(f"     - MEILI_URL: {os.getenv('MEILI_URL', 'NOT SET')}")
+    print(f"     - MEILI_MASTER_KEY: {'SET' if os.getenv('MEILI_MASTER_KEY') else 'NOT SET'}")
     print()
     
     try:
@@ -94,4 +98,7 @@ if __name__ == "__main__":
         print("\n🎉 All simple tests passed!")
     except Exception as e:
         print(f"\n💥 Test failed: {e}")
+        print(f"Debug info:")
+        print(f"  - Meilisearch URL: {MEILI_URL}")
+        print(f"  - API URL: {API_BASE_URL}")
         exit(1)
