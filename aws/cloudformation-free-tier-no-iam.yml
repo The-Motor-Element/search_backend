@@ -167,7 +167,9 @@ Resources:
           # Function to handle errors gracefully
           handle_error() {
             echo "ERROR: $1"
+            echo "Timestamp: $(date)"
             echo "Continuing deployment despite error..."
+            echo "ERROR: $1" >> /var/log/deployment-errors.log
           }
           
           # Update system packages
@@ -209,26 +211,23 @@ Resources:
           echo "Waiting for services to initialize..."
           sleep 60
           
-          # Load demo data
-          echo "Loading demo data..."
-          sleep 30  # Give services time to fully start
+          # Wait for services to be ready
+          echo "Waiting for services to be ready..."
+          sleep 30
           
-          # Check if data loading is available
-          if [ -f "scripts/load_apollo_data.py" ]; then
-            echo "Loading Apollo tire data..."
-            docker-compose exec -T api python scripts/load_apollo_data.py || handle_error "Apollo data loading failed"
-          elif [ -f "scripts/seed.py" ]; then
-            echo "Loading seed data..."
-            docker-compose exec -T api python scripts/seed.py || handle_error "Seed data loading failed"
-          else
-            echo "No data loading script found - skipping data load"
+          # Check if services are running before data loading
+          echo "Verifying services are running..."
+          if ! docker-compose ps | grep -q "Up"; then
+            handle_error "Services not running properly"
+            echo "Attempting to restart services..."
+            docker-compose down || handle_error "Docker compose down failed"
+            sleep 10
+            docker-compose up -d || handle_error "Docker compose restart failed"
+            sleep 30
           fi
-                  
-          # Load demo data
-          echo "Loading demo data..."
-          sleep 30  # Give services time to fully start
           
-          # Check if data loading is available
+          # Load demo data (single attempt)
+          echo "Loading demo data..."
           if [ -f "scripts/load_apollo_data.py" ]; then
             echo "Loading Apollo tire data..."
             docker-compose exec -T api python scripts/load_apollo_data.py || handle_error "Apollo data loading failed"
@@ -278,8 +277,8 @@ Resources:
           
           # Enable and start the service
           echo "Enabling Apollo Search service..."
-          systemctl daemon-reload
-          systemctl enable apollo-search.service
+          systemctl daemon-reload || handle_error "Systemd daemon reload failed"
+          systemctl enable apollo-search.service || handle_error "Service enable failed"
           
           # Wait for Docker to be fully ready
           echo "Waiting for Docker to be ready..."
@@ -287,19 +286,25 @@ Resources:
           
           # Start the services
           echo "Starting Apollo Search services..."
-          systemctl start apollo-search.service
+          systemctl start apollo-search.service || handle_error "Service start failed"
           
-          # Wait for services to initialize
+          # Wait for services to initialize with timeout
           echo "Waiting for services to initialize..."
           sleep 30
           
-          # Verify services are running
+          # Verify services are running with error handling
           echo "Verifying services..."
-          docker-compose -f /opt/apollo-search/docker-compose.yml ps
+          if ! docker-compose -f /opt/apollo-search/docker-compose.yml ps; then
+            handle_error "Failed to check service status"
+          fi
           
-          # Test MeiliSearch
-          echo "Testing MeiliSearch..."
-          timeout 30 bash -c 'until curl -s http://localhost:7700/health; do sleep 2; done'
+          # Test MeiliSearch with better error handling
+          echo "Testing MeiliSearch connection..."
+          if ! timeout 60 bash -c 'until curl -s http://localhost:7700/health; do echo "Waiting for MeiliSearch..."; sleep 5; done'; then
+            handle_error "MeiliSearch health check failed"
+          else
+            echo "MeiliSearch is healthy!"
+          fi
           
           # Create welcome message
           cat > /home/ec2-user/README.txt << EOF
@@ -338,6 +343,42 @@ Resources:
           EOF
           
           chown ec2-user:ec2-user /home/ec2-user/README.txt
+          
+          # Final deployment verification
+          echo "=== Final Deployment Verification ==="
+          echo "Checking all services status..."
+          
+          # Check Docker is running
+          if systemctl is-active --quiet docker; then
+            echo "✅ Docker service is running"
+          else
+            handle_error "Docker service is not running"
+          fi
+          
+          # Check if containers are running
+          if docker-compose -f /opt/apollo-search/docker-compose.yml ps | grep -q "Up"; then
+            echo "✅ Docker containers are running"
+          else
+            handle_error "Docker containers are not running properly"
+          fi
+          
+          # Check MeiliSearch one more time
+          if curl -s http://localhost:7700/health > /dev/null; then
+            echo "✅ MeiliSearch is responding"
+          else
+            handle_error "MeiliSearch is not responding"
+          fi
+          
+          # Log final status
+          echo "=== Deployment Summary ==="
+          echo "Started: $(head -1 /var/log/user-data.log | grep "Starting Apollo")"
+          echo "Completed: $(date)"
+          if [ -f /var/log/deployment-errors.log ]; then
+            echo "Errors encountered: $(wc -l < /var/log/deployment-errors.log)"
+            echo "Error details in: /var/log/deployment-errors.log"
+          else
+            echo "No errors logged"
+          fi
           
           echo "✅ Apollo Search Backend deployment completed successfully!"
           echo "Instance IP: $INSTANCE_IP"
