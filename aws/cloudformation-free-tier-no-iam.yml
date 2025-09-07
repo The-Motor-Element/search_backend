@@ -153,8 +153,7 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # Enable strict error handling
-          set -e
+          # Enable error logging but don't exit on first error
           set -x
           
           # Log everything to a file for debugging
@@ -165,40 +164,46 @@ Resources:
           echo "Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
           echo "Timestamp: $(date)"
           
+          # Function to handle errors gracefully
+          handle_error() {
+            echo "ERROR: $1"
+            echo "Continuing deployment despite error..."
+          }
+          
           # Update system packages
           echo "Updating system packages..."
-          yum update -y
+          yum update -y || handle_error "Package update failed"
           
           # Install Docker
           echo "Installing Docker..."
-          yum install -y docker git curl
+          yum install -y docker git curl || handle_error "Docker installation failed"
           
           # Start Docker service
           echo "Starting Docker service..."
-          systemctl start docker
-          systemctl enable docker
-          usermod -a -G docker ec2-user
+          systemctl start docker || handle_error "Docker start failed"
+          systemctl enable docker || handle_error "Docker enable failed"
+          usermod -a -G docker ec2-user || handle_error "User group modification failed"
           
           # Install Docker Compose
           echo "Installing Docker Compose..."
-          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
-          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose || handle_error "Docker Compose download failed"
+          chmod +x /usr/local/bin/docker-compose || handle_error "Docker Compose chmod failed"
+          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose || handle_error "Docker Compose symlink failed"
           
           # Verify Docker Compose installation
-          docker-compose --version
+          docker-compose --version || handle_error "Docker Compose verification failed"
           
           # Clone the public repository
           echo "Cloning repository..."
-          git clone https://github.com/The-Motor-Element/search_backend.git /opt/apollo-search
-          cd /opt/apollo-search
+          git clone https://github.com/The-Motor-Element/search_backend.git /opt/apollo-search || handle_error "Repository clone failed"
+          cd /opt/apollo-search || handle_error "Directory change failed"
           
           # Make scripts executable
           chmod +x scripts/*.py || echo "No Python scripts to make executable"
           
           # Build and start services
           echo "Building and starting services..."
-          docker-compose up -d
+          docker-compose up -d || handle_error "Docker compose up failed"
           
           # Wait for services to initialize
           echo "Waiting for services to initialize..."
@@ -244,10 +249,10 @@ Resources:
           # Check if data loading is available
           if [ -f "scripts/load_apollo_data.py" ]; then
             echo "Loading Apollo tire data..."
-            docker-compose exec -T api python scripts/load_apollo_data.py || echo "Could not load Apollo data - will continue"
+            docker-compose exec -T api python scripts/load_apollo_data.py || handle_error "Apollo data loading failed"
           elif [ -f "scripts/seed.py" ]; then
             echo "Loading seed data..."
-            docker-compose exec -T api python scripts/seed.py || echo "Could not load seed data - will continue"
+            docker-compose exec -T api python scripts/seed.py || handle_error "Seed data loading failed"
           else
             echo "No data loading script found - skipping data load"
           fi
@@ -357,6 +362,10 @@ Resources:
           echo "UI URL: http://$INSTANCE_IP:8080"
           echo "API URL: http://$INSTANCE_IP:8001/docs"
           echo "MeiliSearch URL: http://$INSTANCE_IP:7700"
+          
+          # Signal successful completion
+          echo "🎉 UserData script completed at $(date)"
+          echo "🎉 DEPLOYMENT_SUCCESS" > /tmp/deployment_status
           
       Tags:
         - Key: Name
