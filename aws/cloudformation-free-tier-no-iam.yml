@@ -411,7 +411,7 @@ Outputs:
     
   APIUrl:
     Description: Apollo Search API Base URL
-    Value: !Sub 'http://${EC2Instance.PublicIp}:8000'
+    Value: !Sub 'http://${EC2Instance.PublicIp}:8001'
     
   MeilisearchUrl:
     Description: Meilisearch URL
