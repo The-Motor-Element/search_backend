@@ -84,6 +84,28 @@ jobs:
         timeout 60 bash -c 'until curl -s http://localhost:8001/health > /dev/null; do sleep 1; done'
         echo "All services confirmed healthy!"
         
+    - name: Load test data
+      env:
+        MEILI_URL: http://localhost:7700
+        MEILI_MASTER_KEY: test_key_for_ci
+        PRODUCTS_INDEX: products
+      run: |
+        # Install required packages for data loading
+        pip install meilisearch-python-sdk python-dotenv
+        
+        # Load Apollo tire data if available, otherwise use seed data
+        if [ -f "data/apollo-parsed.tsv" ]; then
+          echo "Loading Apollo tire data..."
+          python scripts/load_apollo_data.py
+        else
+          echo "Apollo data not found, loading seed data..."
+          python scripts/seed.py
+        fi
+        
+        # Verify data was loaded
+        echo "Verifying data loading..."
+        python scripts/verify_data_loading.py
+        
     - name: Run simple health tests
       env:
         API_BASE_URL: http://localhost:8001
