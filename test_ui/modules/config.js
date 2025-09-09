@@ -1,6 +1,6 @@
 // Configuration and constants module
 export const CONFIG = {
-    API_BASE_URL: window.APOLLO_API_URL || 'http://localhost:8001',
+    API_BASE_URL: window.APOLLO_API_URL || process.env.API_URL || 'http://localhost:8001',
     DEBOUNCE_DELAY: 300,
     SUGGESTION_LIMIT: 5,
     AUTO_DISMISS_DELAY: 5000

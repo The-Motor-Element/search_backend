@@ -1,0 +1,342 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Multi-Brand Tire Search Backend - FREE TIER Development Deployment'
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0e95a5e2743ec9ec9
+    us-west-2:
+      AMI: ami-0bbc328167dee8f3c
+    eu-west-1:
+      AMI: ami-0c1b135a30f3c8aa7
+    ap-southeast-1:
+      AMI: ami-0c802847a7dd848c0
+    ap-south-1:
+      AMI: ami-0c2af51e265bd5e0e
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: tire-search-dev
+    Description: Name of the project for resource naming
+    
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+    
+  AllowedIPRange:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: IP range allowed to access the application
+    
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC
+
+Resources:
+  # Simple VPC Setup for Free Tier
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-vpc
+          
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-igw
+          
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+      
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-subnet
+          
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-routes
+          
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # Security Group for Free Tier Development
+  DevelopmentSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-sg
+      GroupDescription: Security group for tire search development
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedIPRange
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref AllowedIPRange
+          Description: Tire Search UI
+        - IpProtocol: tcp
+          FromPort: 8001
+          ToPort: 8001
+          CidrIp: !Ref AllowedIPRange
+          Description: FastAPI Backend
+        - IpProtocol: tcp
+          FromPort: 7700
+          ToPort: 7700
+          CidrIp: !Ref AllowedIPRange
+          Description: MeiliSearch Admin
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-sg
+
+  # Free Tier EC2 Instance (t2.micro)
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: t2.micro  # Free Tier
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref DevelopmentSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 8  # Free Tier: 30GB total
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -x
+          exec > >(tee /var/log/user-data.log)
+          exec 2>&1
+          
+          echo "🚀 Starting Multi-Brand Tire Search - FREE TIER Development"
+          echo "=========================================================="
+          echo "Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
+          echo "Started: $(date)"
+          
+          # Get instance IP
+          INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+          echo "Instance IP: $INSTANCE_IP"
+          
+          # Update system
+          echo "📦 Updating system..."
+          yum update -y
+          
+          # Install Docker
+          echo "🐳 Installing Docker..."
+          yum install -y docker git curl
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          
+          # Install Docker Compose
+          echo "🔧 Installing Docker Compose..."
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+          
+          # Clone repository
+          echo "📥 Cloning repository..."
+          git clone https://github.com/The-Motor-Element/search_backend.git /opt/tire-search
+          cd /opt/tire-search
+          
+          # Set up environment for development
+          echo "⚙️ Setting up development environment..."
+          cat > .env << EOF
+          # Free Tier Development Environment
+          MEILI_MASTER_KEY=dev-key-$(date +%s)-change-me
+          MEILI_ENV=development
+          MEILI_URL=http://meilisearch:7700
+          API_BASE_URL=http://$INSTANCE_IP:8001
+          EC2_PUBLIC_IP=$INSTANCE_IP
+          PYTHONPATH=/app
+          EOF
+          
+          # Build and start services
+          echo "🏗️ Starting services..."
+          docker-compose up -d
+          
+          # Wait for services
+          echo "⏳ Waiting for services (60 seconds)..."
+          sleep 60
+          
+          # Load tire data
+          echo "📊 Loading multi-brand tire data..."
+          docker-compose exec -T api python scripts/load_all_tire_data.py || echo "⚠️ Data loading failed - will retry"
+          
+          # Create simple management script
+          cat > /home/ec2-user/manage.sh << 'EOF'
+          #!/bin/bash
+          
+          case "$1" in
+              start)
+                  echo "🚀 Starting tire search..."
+                  cd /opt/tire-search && sudo docker-compose up -d
+                  ;;
+              stop)
+                  echo "🛑 Stopping tire search..."
+                  cd /opt/tire-search && sudo docker-compose down
+                  ;;
+              restart)
+                  echo "🔄 Restarting tire search..."
+                  cd /opt/tire-search && sudo docker-compose restart
+                  ;;
+              status)
+                  echo "📊 Service status:"
+                  cd /opt/tire-search && sudo docker-compose ps
+                  ;;
+              logs)
+                  echo "📄 Service logs:"
+                  cd /opt/tire-search && sudo docker-compose logs -f
+                  ;;
+              data)
+                  echo "📊 Reloading tire data..."
+                  cd /opt/tire-search && sudo docker-compose exec api python scripts/load_all_tire_data.py
+                  ;;
+              urls)
+                  INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+                  echo "🌐 Access URLs:"
+                  echo "   UI: http://$INSTANCE_IP:8080"
+                  echo "   API: http://$INSTANCE_IP:8001/docs"
+                  echo "   Admin: http://$INSTANCE_IP:7700"
+                  ;;
+              *)
+                  echo "Usage: $0 {start|stop|restart|status|logs|data|urls}"
+                  echo ""
+                  echo "Commands:"
+                  echo "  start   - Start all services"
+                  echo "  stop    - Stop all services"
+                  echo "  restart - Restart all services"
+                  echo "  status  - Show service status"
+                  echo "  logs    - Show service logs"
+                  echo "  data    - Reload tire data"
+                  echo "  urls    - Show access URLs"
+                  ;;
+          esac
+          EOF
+          
+          chmod +x /home/ec2-user/manage.sh
+          chown ec2-user:ec2-user /home/ec2-user/manage.sh
+          
+          # Create welcome message
+          cat > /home/ec2-user/README.txt << EOF
+          ============================================
+          🚗 Multi-Brand Tire Search - FREE TIER DEV
+          ============================================
+          
+          Your development environment is ready!
+          
+          🌐 Access URLs:
+          - UI: http://$INSTANCE_IP:8080
+          - API: http://$INSTANCE_IP:8001/docs
+          - Admin: http://$INSTANCE_IP:7700
+          
+          🛠️ Management:
+          ./manage.sh start    # Start services
+          ./manage.sh stop     # Stop services
+          ./manage.sh status   # Check status
+          ./manage.sh urls     # Show URLs
+          ./manage.sh logs     # View logs
+          ./manage.sh data     # Reload data
+          
+          📊 Database:
+          - Apollo: 1,500+ products
+          - CEAT: 1,100+ products
+          - MRF: 1,700+ products
+          - Eurogrip: 100+ products
+          
+          💰 Cost: FREE TIER
+          - Instance: t2.micro (free)
+          - Storage: 8GB (free)
+          - Transfer: 1GB/month (free)
+          
+          📁 Project: /opt/tire-search
+          📄 Logs: /var/log/user-data.log
+          EOF
+          
+          chown ec2-user:ec2-user /home/ec2-user/README.txt
+          
+          echo "✅ Free tier development deployment completed!"
+          echo "🌐 UI: http://$INSTANCE_IP:8080"
+          echo "📡 API: http://$INSTANCE_IP:8001/docs"
+          echo "🔍 Admin: http://$INSTANCE_IP:7700"
+          echo "🎉 Ready for development!"
+          
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-instance
+        - Key: Environment
+          Value: development
+        - Key: CostCenter
+          Value: free-tier
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+    
+  PublicIP:
+    Description: Public IP address
+    Value: !GetAtt EC2Instance.PublicIp
+    
+  UIUrl:
+    Description: Tire Search UI
+    Value: !Sub 'http://${EC2Instance.PublicIp}:8080'
+    
+  APIUrl:
+    Description: API Documentation
+    Value: !Sub 'http://${EC2Instance.PublicIp}:8001/docs'
+    
+  AdminUrl:
+    Description: MeiliSearch Admin
+    Value: !Sub 'http://${EC2Instance.PublicIp}:7700'
+    
+  SSHCommand:
+    Description: SSH command
+    Value: !Sub 'ssh -i ${KeyPairName}.pem ec2-user@${EC2Instance.PublicIp}'
+    
+  ManagementTip:
+    Description: How to manage services
+    Value: 'SSH to instance and run: ./manage.sh status'
+    
+  FreeTierNote:
+    Description: Free tier information
+    Value: 'This deployment uses AWS Free Tier resources - $0/month for first 12 months!'

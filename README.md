@@ -1,27 +1,24 @@
-# 🔍 Multi-Brand Tire Search Backend - Local Development
+# 🔍 Multi-Brand Tire Search Backend
 
-A powerful tire search engine built with **FastAPI**, **MeiliSearch**, and **React** supporting multiple tire brands including Apollo, CEAT, MRF, and Eurogrip.
+A powerful tire search engine built with **FastAPI**, **MeiliSearch**, and **Docker** supporting multiple tire brands including Apollo, CEAT, MRF, and Eurogrip.
 
 ## ✨ Features
 
 - 🚀 **Fast Search**: Powered by MeiliSearch for instant tire search results across all brands
-- 🏭 **Multi-Brand Support**: Search across Apollo, CEAT, MRF, Eurogrip tire catalogs
+- 🏭 **Multi-Brand Support**: Search across Apollo, CEAT, MRF, Eurogrip tire catalogs (4,600+ products)
 - 📊 **Rich Filtering**: Search by size, brand, pattern, group, and vehicle compatibility  
 - 🎯 **Typo Tolerance**: Find results even with misspellings
 - 📈 **Real-time Suggestions**: Auto-complete and search-as-you-type
 - 🔧 **RESTful API**: Clean, documented API endpoints
-- 🖥️ **Web Interface**: Simple React-based search interface
+- 🖥️ **Web Interface**: Simple JavaScript-based search interface
 - 🐳 **Docker Support**: Easy setup with Docker Compose
+- ☁️ **AWS Free Tier**: Deploy to cloud for $0/month
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Local Development
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [Python 3.11+](https://www.python.org/downloads/) (for local API development)
-- [Git](https://git-scm.com/downloads)
-
-### Option 1: Docker Compose (Recommended)
+### Local Development
 
 **Step 1: Clone and Start Services**
 ```bash
@@ -41,38 +38,30 @@ docker-compose exec api python scripts/load_all_tire_data.py
 - 📡 **API Documentation**: http://localhost:8001/docs
 - 🔍 **MeiliSearch Dashboard**: http://localhost:7700
 
-### Option 2: Local API Development
+### AWS Free Tier Deployment ($0/month)
 
-For API development without Docker:
+Deploy to AWS completely free using Free Tier resources:
 
-**Step 1: Install Dependencies**
 ```bash
-pip install -r requirements.txt
+# One-command deployment
+./deploy-free-tier.sh -k your-keypair-name -i
+
+# Test deployment
+./test-free-tier.sh http://YOUR-EC2-IP
 ```
 
-**Step 2: Start MeiliSearch**
+See [FREE-TIER-README.md](FREE-TIER-README.md) for complete AWS deployment guide.
+
+### Cloud Sharing with Cloudflare Tunnels
+
+Share your local development with your team instantly:
+
 ```bash
-docker run -d -p 7700:7700 getmeili/meilisearch:latest
+# Quick temporary sharing
+./quick-share.sh
 ```
 
-**Step 3: Run API Server**
-```bash
-# Set environment variables
-export MEILI_URL=http://localhost:7700
-export MEILI_MASTER_KEY=development_key_please_change_in_production
-
-# Start the API
-uvicorn app.main:app --reload --port 8000
-```
-
-**Step 4: Load Data**
-```bash
-python scripts/load_all_tire_data.py
-```
-
-**Step 5: Access the API**
-- 📡 **API Documentation**: http://localhost:8000/docs
-- 🏥 **Health Check**: http://localhost:8000/health
+See [CLOUDFLARED.md](CLOUDFLARED.md) for team sharing setup.
 
 ## 🔧 Development Commands
 
@@ -90,23 +79,8 @@ docker-compose down
 # Rebuild containers
 docker-compose build
 
-# Execute commands in API container
+# Load data
 docker-compose exec api python scripts/load_all_tire_data.py
-```
-
-### API Commands
-```bash
-# Start API in development mode
-uvicorn app.main:app --reload --port 8000
-
-# Load multi-brand tire data
-python scripts/load_all_tire_data.py
-
-# Run tests
-pytest tests/ -v
-
-# Run tests with coverage
-pytest --cov=app tests/
 ```
 
 ### Testing the API
@@ -120,24 +94,26 @@ curl "http://localhost:8001/search?q=175/70R13&limit=5"
 # Filter by specific brand
 curl "http://localhost:8001/search?q=tire&filters=brand=CEAT&limit=5"
 
-# Filter by tire size
-curl "http://localhost:8001/search?q=155/80&limit=10"
-
 # Get all available brands
 curl "http://localhost:8001/search/filters/brands"
 
-# Get statistics by brand
+# Get statistics
 curl http://localhost:8001/analytics/stats
 ```
 
-## 📊 Sample Data
+## 📊 Multi-Brand Tire Database
 
-The application includes multi-brand tire data with:
-- **4,600+ tire products** across 4 major brands
-- **Apollo**: 1,557 products (SCV, Passenger Car, HCV, etc.)
-- **CEAT**: 1,139 products (Farm, Industrial, BHL, etc.)  
-- **MRF**: 1,785 products (Car Radial, Rally, Farm, etc.)
-- **Eurogrip**: 118 products (Agriculture, Forklift, etc.)
+The application includes comprehensive tire data:
+
+| Brand | Products | Categories | Examples |
+|-------|----------|------------|----------|
+| **Apollo** | 1,557 | SCV, Passenger Car, HCV, Two Wheeler | Alnac 4G, Apterra, Acti series |
+| **CEAT** | 1,139 | Farm, Industrial, BHL, Passenger | Grader, Czar series |  
+| **MRF** | 1,785 | Car Radial, Rally, Farm, Two Wheeler | ZV2K, Wanderer series |
+| **Eurogrip** | 118 | Agriculture, Forklift, Industrial | TVS brand products |
+| **Total** | **4,600+** | All vehicle types | Complete tire catalog |
+
+### Features by Brand
 - Size specifications (155/80 R13, 175/70R13, etc.)
 - Ply ratings and load indices
 - Pattern names and categories
@@ -168,178 +144,132 @@ The application includes multi-brand tire data with:
 
 ## 🧪 Testing
 
-### Run All Tests
+### Run Tests
 ```bash
+# Run all tests
 pytest tests/ -v
-```
 
-### Run Specific Tests
-```bash
-# Test endpoints only
-pytest tests/test_endpoints.py -v
-
-# Test with coverage report
+# Test with coverage
 pytest --cov=app --cov-report=html tests/
 
-# Run simple health test
-pytest tests/test_simple_health.py -v
+# Test specific endpoints
+pytest tests/test_endpoints.py -v
 ```
-
-### Test Configuration
-Tests use the configuration in `pytest.ini`:
-- API Base URL: `http://localhost:8001` (Docker) or `http://localhost:8000` (local)
-- Environment variables from `.env` file
 
 ## 📁 Project Structure
 
 ```
 search_backend/
 ├── app/
-│   ├── main.py          # FastAPI application
-│   └── schemas.py       # Pydantic models
+│   ├── main.py              # FastAPI application
+│   └── schemas.py           # Pydantic models
 ├── scripts/
-│   └── load_all_tire_data.py     # Multi-brand data loading script
+│   └── load_all_tire_data.py     # Multi-brand data loader
 ├── data/
 │   ├── Apollo-parsed.tsv         # Apollo tire data
 │   ├── CEAT-parsed.tsv          # CEAT tire data  
 │   ├── MRF-Parsed.tsv           # MRF tire data
 │   └── Eurogrip.tsv             # Eurogrip tire data
 ├── test_ui/
-│   ├── index.html            # Simple web interface
-│   ├── script.js            # Frontend JavaScript
-│   ├── styles.css           # CSS styles
-│   └── server.py            # Simple Python web server
+│   ├── index.html            # Web interface
+│   ├── modules/             # JavaScript modules
+│   └── server.py            # Python web server
 ├── tests/
-│   ├── test_endpoints.py    # API endpoint tests
-│   ├── test_simple_health.py # Basic health tests
-│   └── conftest.py          # Test configuration
-├── docker-compose.yml       # Docker services configuration
-├── Dockerfile.api          # API container definition
-├── Dockerfile.ui           # UI container definition
-├── requirements.txt        # Python dependencies
-└── pytest.ini            # Test configuration
+│   └── test_endpoints.py    # API tests
+├── docker-compose.yml       # Docker services
+├── deploy-free-tier.sh     # AWS Free Tier deployment
+├── cloudformation-free-tier.yml  # AWS template
+├── FREE-TIER-README.md     # AWS deployment guide
+└── requirements.txt        # Python dependencies
 ```
 
-## 🔧 Configuration
+## ☁️ Deployment Options
 
-### Environment Variables
-
-Create a `.env` file for local development:
-
+### 1. AWS Free Tier ($0/month)
+Perfect for development and testing:
 ```bash
-# MeiliSearch Configuration
-MEILI_MASTER_KEY=development_key_please_change_in_production
-MEILI_ENV=development
-MEILI_URL=http://localhost:7700
-
-# API Configuration
-API_BASE_URL=http://localhost:8001
-PYTHONPATH=/app
+./deploy-free-tier.sh -k your-keypair -i
 ```
 
-### Docker Compose Services
+### 2. Local Development
+For coding and testing:
+```bash
+docker-compose up -d
+```
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `meilisearch` | 7700 | Search engine and dashboard |
-| `api` | 8001 | FastAPI backend |
-| `ui` | 8080 | Simple React frontend |
+### 3. Team Sharing
+Share with team via Cloudflare Tunnels:
+```bash
+./quick-share.sh
+```
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**1. Port Conflicts**
-```bash
-# Check what's using the ports
-lsof -i :7700  # MeiliSearch
-lsof -i :8001  # API
-lsof -i :8080  # UI
-
-# Kill processes if needed
-sudo kill -9 $(lsof -t -i:7700)
-```
-
-**2. Services Not Starting**
+**Services Not Starting**
 ```bash
 # Check service status
 docker-compose ps
 
-# View service logs
+# View logs
 docker-compose logs meilisearch
 docker-compose logs api
-docker-compose logs ui
 
-# Restart all services
+# Restart services
 docker-compose restart
 ```
 
-**3. Data Not Loading**
+**Data Not Loading**
 ```bash
-# Check MeiliSearch health
-curl http://localhost:7700/health
-
-# Reload multi-brand data
+# Reload data
 docker-compose exec api python scripts/load_all_tire_data.py
 
-# Check if data is indexed
+# Check data indexed
 curl "http://localhost:8001/search?q=&limit=1"
-
-# Check brand distribution
-curl "http://localhost:8001/search/filters/brands"
 ```
 
-**4. API Not Responding**
+**API Not Responding**
 ```bash
 # Check API health
 curl http://localhost:8001/health
 
-# Check API logs
-docker-compose logs api
-
-# Rebuild API container
-docker-compose build api
-docker-compose up -d api
+# Rebuild containers
+docker-compose build
+docker-compose up -d
 ```
-
-### Development Tips
-
-- Use `docker-compose logs -f` to monitor all services in real-time
-- The API automatically reloads when you change Python files (in Docker)
-- MeiliSearch data persists in Docker volumes between restarts
-- Check `/docs` endpoint for interactive API testing
 
 ## 🚀 Getting Started Checklist
 
-- [ ] Clone the repository
 - [ ] Install Docker and Docker Compose
+- [ ] Clone the repository
 - [ ] Run `docker-compose up -d`
-- [ ] Wait for services to be healthy (~30 seconds)
 - [ ] Load data: `docker-compose exec api python scripts/load_all_tire_data.py`
-- [ ] Test API: Visit http://localhost:8001/docs
 - [ ] Test UI: Visit http://localhost:8080
-- [ ] Run tests: `pytest tests/ -v`
-- [ ] **Optional**: Share with team using `./quick-share.sh` (see [CLOUDFLARED.md](CLOUDFLARED.md))
+- [ ] Test API: Visit http://localhost:8001/docs
+- [ ] **For AWS**: Run `./deploy-free-tier.sh -k your-keypair -i`
+- [ ] **For sharing**: Run `./quick-share.sh`
 
-## 🌐 Team Sharing
+## 🌐 Production Deployment
 
-Want to share your tire search with your team? Use Cloudflare Tunnels:
+For production use, consider:
+- Using managed databases (AWS RDS, etc.)
+- Setting up SSL/TLS certificates
+- Implementing proper authentication
+- Setting up monitoring and logging
+- Using container orchestration (EKS, ECS)
 
-```bash
-# Quick temporary sharing
-./quick-share.sh
+## 📚 API Documentation
 
-# Or persistent team access  
-./cloudflared-setup.sh
-```
+Once running, visit:
+- **Interactive docs**: http://localhost:8001/docs
+- **Alternative docs**: http://localhost:8001/redoc
 
-See [CLOUDFLARED.md](CLOUDFLARED.md) for detailed setup instructions.
-
-## 📚 Learn More
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [MeiliSearch Documentation](https://docs.meilisearch.com/)
-- [Docker Compose Guide](https://docs.docker.com/compose/)
+Key endpoints:
+- `GET /search` - Search tires across all brands
+- `GET /search/filters/brands` - Get available brands
+- `GET /analytics/stats` - Database statistics
+- `GET /health` - Health check
 
 ## 🤝 Contributing
 
@@ -353,3 +283,7 @@ See [CLOUDFLARED.md](CLOUDFLARED.md) for detailed setup instructions.
 ## 📄 License
 
 MIT License - see LICENSE file for details.
+
+---
+
+🎉 **Ready to search 4,600+ tire products across 4 major brands!**
