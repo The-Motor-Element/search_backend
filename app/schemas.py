@@ -10,13 +10,13 @@ from decimal import Decimal
 
 class Product(BaseModel):
     """
-    Apollo Tire Product model for tire/automotive parts indexing
-    Based on Apollo tire catalog data structure
+    Multi-brand Tire Product model for tire/automotive parts indexing
+    Supports Apollo, CEAT, MRF, Eurogrip, and other tire manufacturers
     """
     id: str = Field(..., description="Unique product identifier (MPN)")
-    group: str = Field(..., description="Product group category")
+    group: Optional[str] = Field(None, description="Product group category")
     material: str = Field(..., description="Material description/product name")
-    record_type: str = Field(..., description="Type of record (Tyre, Flaps, etc.)")
+    record_type: Optional[str] = Field(None, description="Type of record (Tyre, Flaps, etc.)")
     mpn: str = Field(..., description="Manufacturer Part Number")
     size: Optional[str] = Field(None, description="Tire/product size")
     ply_rating: Optional[str] = Field(None, description="Ply rating (e.g., 8PR, 6PR)")
@@ -29,7 +29,7 @@ class Product(BaseModel):
     
     # Additional computed fields for better search
     title: Optional[str] = Field(None, description="Computed title for search")
-    brand: str = Field(default="Apollo", description="Brand (Apollo)")
+    brand: str = Field(..., description="Brand (Apollo, CEAT, MRF, Eurogrip, etc.)")
     category: Optional[str] = Field(None, description="Computed category")
     tags: Optional[List[str]] = Field(default_factory=list, description="Search tags")
 
@@ -135,13 +135,14 @@ class IndexSettings(BaseModel):
                     "pattern_model", 
                     "mpn",
                     "size",
+                    "brand",
                     "group",
                     "tags"
                 ],
                 "filterable_attributes": [
+                    "brand",
                     "group",
                     "record_type",
-                    "brand", 
                     "ply_rating",
                     "construction_type",
                     "load_index",
@@ -151,6 +152,7 @@ class IndexSettings(BaseModel):
                     "category"
                 ],
                 "sortable_attributes": [
+                    "brand",
                     "size",
                     "load_index",
                     "speed_rating",

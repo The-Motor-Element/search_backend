@@ -1,4 +1,4 @@
-// Apollo Tire Search UI JavaScript
+// Multi-Brand Tire Search UI JavaScript
 
 // Get API URL from window configuration or default to localhost
 const API_BASE_URL = window.APOLLO_API_URL || 'http://localhost:8001';
@@ -27,7 +27,7 @@ async function initializeApp() {
         // Set default interface to faceted search
         updateSearchInterface();
         
-        console.log('🚀 Apollo Tire Search UI initialized successfully');
+        console.log('🚀 Multi-Brand Tire Search UI initialized successfully');
     } catch (error) {
         console.error('❌ Failed to initialize app:', error);
         showAlert('Failed to initialize application. Please check if the API server is running.', 'danger');
@@ -592,7 +592,7 @@ function extractProductName(material) {
         if (patternMatch) {
             name = patternMatch[1];
         } else {
-            name = 'Apollo Tire Product';
+            name = 'Tire Product';
         }
     }
     

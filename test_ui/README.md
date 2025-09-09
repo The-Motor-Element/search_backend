@@ -1,8 +1,8 @@
-# Apollo Tire Search - Test UI
+# Multi-Brand Tire Search - Test UI
 
 **Interactive demonstration of advanced Meilisearch features**
 
-This test UI showcases all the powerful search capabilities implemented in the Apollo tire search backend, providing an intuitive interface to explore and test advanced features.
+This test UI showcases all the powerful search capabilities implemented in the multi-brand tire search backend, providing an intuitive interface to explore and test advanced features across Apollo, CEAT, MRF, and Eurogrip tire catalogs.
 
 ## 🌟 Features Demonstrated
 
@@ -67,7 +67,7 @@ start index.html  # Windows
 
 ## 📋 Prerequisites
 
-1. **API Server Running**: Ensure the Apollo tire search backend is running on `http://localhost:8001`
+1. **API Server Running**: Ensure the multi-brand tire search backend is running on `http://localhost:8001`
 2. **Modern Browser**: Chrome, Firefox, Safari, or Edge (latest versions)
 3. **Network Access**: Browser must be able to reach the API server
 
@@ -197,4 +197,4 @@ Enable browser developer tools to see:
 
 ---
 
-🎉 **Enjoy exploring the advanced search capabilities!** This UI demonstrates the full power of modern search technology applied to the Apollo tire catalog.
+🎉 **Enjoy exploring the advanced search capabilities!** This UI demonstrates the full power of modern search technology applied to multiple tire brand catalogs including Apollo, CEAT, MRF, and Eurogrip.

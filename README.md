@@ -1,11 +1,12 @@
-# 🔍 Apollo Tire Search Backend - Local Development
+# 🔍 Multi-Brand Tire Search Backend - Local Development
 
-A powerful tire search engine built with **FastAPI**, **MeiliSearch**, and **React** for local development and testing.
+A powerful tire search engine built with **FastAPI**, **MeiliSearch**, and **React** supporting multiple tire brands including Apollo, CEAT, MRF, and Eurogrip.
 
 ## ✨ Features
 
-- 🚀 **Fast Search**: Powered by MeiliSearch for instant tire search results
-- 📊 **Rich Filtering**: Search by size, brand, pattern, and vehicle compatibility  
+- 🚀 **Fast Search**: Powered by MeiliSearch for instant tire search results across all brands
+- 🏭 **Multi-Brand Support**: Search across Apollo, CEAT, MRF, Eurogrip tire catalogs
+- 📊 **Rich Filtering**: Search by size, brand, pattern, group, and vehicle compatibility  
 - 🎯 **Typo Tolerance**: Find results even with misspellings
 - 📈 **Real-time Suggestions**: Auto-complete and search-as-you-type
 - 🔧 **RESTful API**: Clean, documented API endpoints
@@ -29,10 +30,10 @@ cd search_backend
 docker-compose up -d
 ```
 
-**Step 2: Load Apollo Tire Data**
+**Step 2: Load Multi-Brand Tire Data**
 ```bash
 # Wait for services to be healthy (about 30 seconds)
-docker-compose exec api python scripts/load_apollo_data.py
+docker-compose exec api python scripts/load_all_tire_data.py
 ```
 
 **Step 3: Access the Application**
@@ -66,7 +67,7 @@ uvicorn app.main:app --reload --port 8000
 
 **Step 4: Load Data**
 ```bash
-python scripts/load_apollo_data.py
+python scripts/load_all_tire_data.py
 ```
 
 **Step 5: Access the API**
@@ -90,7 +91,7 @@ docker-compose down
 docker-compose build
 
 # Execute commands in API container
-docker-compose exec api python scripts/load_apollo_data.py
+docker-compose exec api python scripts/load_all_tire_data.py
 ```
 
 ### API Commands
@@ -98,8 +99,8 @@ docker-compose exec api python scripts/load_apollo_data.py
 # Start API in development mode
 uvicorn app.main:app --reload --port 8000
 
-# Load Apollo tire data
-python scripts/load_apollo_data.py
+# Load multi-brand tire data
+python scripts/load_all_tire_data.py
 
 # Run tests
 pytest tests/ -v
@@ -113,45 +114,56 @@ pytest --cov=app tests/
 # Health check
 curl http://localhost:8001/health
 
-# Search for Apollo tires
-curl "http://localhost:8001/search?q=apollo&limit=5"
+# Search across all brands
+curl "http://localhost:8001/search?q=175/70R13&limit=5"
+
+# Filter by specific brand
+curl "http://localhost:8001/search?q=tire&filters=brand=CEAT&limit=5"
 
 # Filter by tire size
 curl "http://localhost:8001/search?q=155/80&limit=10"
 
-# Browse by category
-curl "http://localhost:8001/search?filters=category=passenger"
+# Get all available brands
+curl "http://localhost:8001/search/filters/brands"
 
-# Get statistics
-curl http://localhost:8001/stats
+# Get statistics by brand
+curl http://localhost:8001/analytics/stats
 ```
 
 ## 📊 Sample Data
 
-The application includes Apollo tire data with:
-- **1,557+ tire products**
-- Size specifications (155/80 R13, etc.)
+The application includes multi-brand tire data with:
+- **4,600+ tire products** across 4 major brands
+- **Apollo**: 1,557 products (SCV, Passenger Car, HCV, etc.)
+- **CEAT**: 1,139 products (Farm, Industrial, BHL, etc.)  
+- **MRF**: 1,785 products (Car Radial, Rally, Farm, etc.)
+- **Eurogrip**: 118 products (Agriculture, Forklift, etc.)
+- Size specifications (155/80 R13, 175/70R13, etc.)
 - Ply ratings and load indices
 - Pattern names and categories
-- Brand and vehicle compatibility
+- Brand-specific vehicle compatibility
 
 ## 🔍 API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/search` | GET | Search tires with filters and sorting |
+| `/search` | GET | Search tires across all brands with filters and sorting |
+| `/search/filters/brands` | GET | Get all available tire brands |
+| `/search/filters/groups` | GET | Get all product groups |
+| `/search/filters/record-types` | GET | Get all record types |
+| `/search/facets` | GET | Faceted search with brand/group distributions |
+| `/analytics/stats` | GET | Multi-brand database and index statistics |
 | `/health` | GET | Health check for all services |
-| `/stats` | GET | Database and index statistics |
 | `/docs` | GET | Interactive API documentation |
 
 ### Search Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `q` | string | Search query |
+| `q` | string | Search query (works across all brands) |
 | `limit` | int | Number of results (default: 10) |
 | `offset` | int | Pagination offset (default: 0) |
-| `filters` | string | Facet filters (e.g., `category=passenger`) |
+| `filters` | string | Facet filters (e.g., `brand=Apollo`, `group=SCV`) |
 | `sort` | string | Sort field and order |
 
 ## 🧪 Testing
@@ -186,9 +198,12 @@ search_backend/
 │   ├── main.py          # FastAPI application
 │   └── schemas.py       # Pydantic models
 ├── scripts/
-│   └── load_apollo_data.py    # Data loading script
+│   └── load_all_tire_data.py     # Multi-brand data loading script
 ├── data/
-│   └── apollo-parsed.tsv      # Apollo tire sample data
+│   ├── Apollo-parsed.tsv         # Apollo tire data
+│   ├── CEAT-parsed.tsv          # CEAT tire data  
+│   ├── MRF-Parsed.tsv           # MRF tire data
+│   └── Eurogrip.tsv             # Eurogrip tire data
 ├── test_ui/
 │   ├── index.html            # Simple web interface
 │   ├── script.js            # Frontend JavaScript
@@ -264,11 +279,14 @@ docker-compose restart
 # Check MeiliSearch health
 curl http://localhost:7700/health
 
-# Reload Apollo data
-docker-compose exec api python scripts/load_apollo_data.py
+# Reload multi-brand data
+docker-compose exec api python scripts/load_all_tire_data.py
 
 # Check if data is indexed
 curl "http://localhost:8001/search?q=&limit=1"
+
+# Check brand distribution
+curl "http://localhost:8001/search/filters/brands"
 ```
 
 **4. API Not Responding**
@@ -297,7 +315,7 @@ docker-compose up -d api
 - [ ] Install Docker and Docker Compose
 - [ ] Run `docker-compose up -d`
 - [ ] Wait for services to be healthy (~30 seconds)
-- [ ] Load data: `docker-compose exec api python scripts/load_apollo_data.py`
+- [ ] Load data: `docker-compose exec api python scripts/load_all_tire_data.py`
 - [ ] Test API: Visit http://localhost:8001/docs
 - [ ] Test UI: Visit http://localhost:8080
 - [ ] Run tests: `pytest tests/ -v`

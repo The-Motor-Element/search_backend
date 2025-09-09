@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple HTTP Server for Apollo Tire Search Test UI
+Simple HTTP Server for Multi-Brand Tire Search Test UI
 Serves static files with proper CORS headers for API integration
 """
 
@@ -41,7 +41,7 @@ def main():
     script_dir = Path(__file__).parent
     os.chdir(script_dir)
     
-    print("🚀 Starting Apollo Tire Search Test UI Server")
+    print("🚀 Starting Multi-Brand Tire Search Test UI Server")
     print("=" * 50)
     print(f"📁 Serving files from: {script_dir}")
     print(f"🌐 Server URL: http://{HOST}:{PORT}")

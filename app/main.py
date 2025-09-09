@@ -1,6 +1,7 @@
 """
-E-commerce Search Backend using Meilisearch and FastAPI
-Production-ready microservice for product search and indexing
+Multi-Brand Tire Search Backend using Meilisearch and FastAPI
+Production-ready microservice for tire product search and indexing
+Supports Apollo, CEAT, MRF, Eurogrip, and other tire manufacturers
 """
 
 import os
@@ -123,8 +124,8 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app with lifespan management
 app = FastAPI(
-    title="E-commerce Search Backend",
-    description="Production-ready search microservice using Meilisearch",
+    title="Multi-Brand Tire Search Backend",
+    description="Production-ready tire search microservice supporting Apollo, CEAT, MRF, Eurogrip and more",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -347,6 +348,28 @@ async def search_with_facets(
     except Exception as e:
         logger.error(f"Faceted search error: {e}")
         raise HTTPException(status_code=500, detail=f"Faceted search failed: {str(e)}")
+
+
+@app.get("/search/filters/brands")
+async def get_available_brands():
+    """
+    Get all available tire brands for filter UI
+    """
+    try:
+        index = meili_client.index(PRODUCTS_INDEX)
+        
+        # Search with brand facet to get all available brands
+        results = await index.search("", facets=["brand"], limit=0)
+        brands = getattr(results, 'facet_distribution', {}).get('brand', {})
+        
+        return {
+            "brands": [{"value": brand, "count": count} for brand, count in brands.items()],
+            "total_brands": len(brands)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting brands: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get brands: {str(e)}")
 
 
 @app.get("/search/filters/groups")
@@ -577,7 +600,7 @@ async def get_search_statistics():
         stats = await index.get_stats()
         
         # Get facet distributions for analytics
-        facet_search = await index.search("", facets=["group", "record_type", "ply_rating"], limit=0)
+        facet_search = await index.search("", facets=["brand", "group", "record_type", "ply_rating"], limit=0)
         facets = getattr(facet_search, 'facet_distribution', {})
         
         return {
@@ -587,10 +610,12 @@ async def get_search_statistics():
                 "field_distribution": getattr(stats, 'field_distribution', {})
             },
             "facet_analytics": {
+                "brands": facets.get('brand', {}),
                 "groups": facets.get('group', {}),
                 "record_types": facets.get('record_type', {}),
                 "ply_ratings": {k: v for k, v in facets.get('ply_rating', {}).items() if k}
             },
+            "top_brands": sorted(facets.get('brand', {}).items(), key=lambda x: x[1], reverse=True)[:10],
             "top_groups": sorted(facets.get('group', {}).items(), key=lambda x: x[1], reverse=True)[:10],
             "top_record_types": sorted(facets.get('record_type', {}).items(), key=lambda x: x[1], reverse=True)[:10]
         }
@@ -616,7 +641,7 @@ async def health_check():
                 "status": health.status if hasattr(health, 'status') else "available",
                 "version": version.pkg_version if hasattr(version, 'pkg_version') else str(version)
             },
-            "service": "apollo-tire-search-backend"
+            "service": "multi-brand-tire-search-backend"
         }
         
     except Exception as e:
@@ -626,7 +651,7 @@ async def health_check():
             content={
                 "status": "unhealthy",
                 "error": str(e),
-                "service": "apollo-tire-search-backend"
+                "service": "multi-brand-tire-search-backend"
             }
         )
 

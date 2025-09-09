@@ -98,7 +98,7 @@ class TestHealthEndpoint:
         assert "status" in data
         assert "meilisearch" in data
         assert "service" in data
-        assert data["service"] == "apollo-tire-search-backend"
+        assert data["service"] == "multi-brand-tire-search-backend"
 
 
 class TestIndexingEndpoints:
