@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Search Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
+        .error { background: #fee; border-color: #f00; }
+        .success { background: #efe; border-color: #0f0; }
+        button { padding: 10px 20px; margin: 5px; }
+        #log { height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Simple Search Test</h1>
+    
+    <div>
+        <input type="text" id="testQuery" value="LOADSTAR" placeholder="Enter search query">
+        <button onclick="testDirectAPI()">Test Direct API</button>
+        <button onclick="testSearchManager()">Test Search Manager</button>
+        <button onclick="checkAppState()">Check App State</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="results"></div>
+    <div id="log"></div>
+    
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testDirectAPI() {
+            log("Testing direct API call...");
+            const query = document.getElementById('testQuery').value;
+            
+            try {
+                const url = `http://localhost:8001/search?q=${encodeURIComponent(query)}&limit=3`;
+                log(`Making request to: ${url}`);
+                
+                const response = await fetch(url);
+                log(`Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                log(`✅ API Response: ${data.hits?.length || 0} hits found`);
+                
+                document.getElementById('results').innerHTML = `
+                    <div class="result success">
+                        <h3>Direct API Test: SUCCESS</h3>
+                        <p><strong>Query:</strong> ${data.query}</p>
+                        <p><strong>Hits:</strong> ${data.hits?.length || 0}</p>
+                        <p><strong>Processing Time:</strong> ${data.processing_time_ms}ms</p>
+                        ${data.hits?.length > 0 ? `<p><strong>First Result:</strong> ${data.hits[0].title || data.hits[0].pattern_model}</p>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                log(`❌ API Error: ${error.message}`);
+                document.getElementById('results').innerHTML = `
+                    <div class="result error">
+                        <h3>Direct API Test: FAILED</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function checkAppState() {
+            log("Checking main app state...");
+            
+            // Try to access the main window
+            try {
+                // Open main app in new window for inspection
+                const mainWindow = window.open('http://localhost:8080', 'mainapp', 'width=1200,height=800');
+                
+                setTimeout(() => {
+                    try {
+                        log("Checking main app window...");
+                        
+                        // Check if elements exist
+                        const elements = {
+                            searchQuery: mainWindow.document.getElementById('searchQuery'),
+                            searchResults: mainWindow.document.getElementById('searchResults'),
+                            searchType: mainWindow.document.getElementById('searchType')
+                        };
+                        
+                        Object.entries(elements).forEach(([name, element]) => {
+                            log(`Element ${name}: ${element ? '✅ Found' : '❌ Missing'}`);
+                        });
+                        
+                        // Check app state
+                        log(`apolloApp: ${mainWindow.apolloApp ? '✅ Found' : '❌ Missing'}`);
+                        log(`searchManager: ${mainWindow.apolloApp?.searchManager ? '✅ Found' : '❌ Missing'}`);
+                        log(`performSearch global: ${typeof mainWindow.performSearch}`);
+                        
+                        if (mainWindow.apolloApp?.apiConfig) {
+                            log(`API URL: ${mainWindow.apolloApp.apiConfig.getApiUrl()}`);
+                        }
+                        
+                        // Try to trigger search
+                        if (elements.searchQuery && mainWindow.performSearch) {
+                            log("Attempting to trigger search in main app...");
+                            elements.searchQuery.value = 'LOADSTAR';
+                            mainWindow.performSearch(0);
+                            log("✅ Search triggered");
+                        } else {
+                            log("❌ Cannot trigger search - missing elements or function");
+                        }
+                        
+                    } catch (error) {
+                        log(`❌ Error accessing main app: ${error.message}`);
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                log(`❌ Error opening main app: ${error.message}`);
+            }
+        }
+        
+        async function testSearchManager() {
+            log("Testing search manager directly...");
+            
+            // Try to create a search manager instance
+            try {
+                // First test if we can access the classes
+                const response = await fetch('http://localhost:8080/js/api-config.js');
+                const apiConfigScript = await response.text();
+                eval(apiConfigScript);
+                
+                const response2 = await fetch('http://localhost:8080/js/search-manager.js');
+                const searchManagerScript = await response2.text();
+                eval(searchManagerScript);
+                
+                log("✅ Scripts loaded successfully");
+                
+                // Create instances
+                const apiConfig = new window.ApiConfig();
+                const searchManager = new window.SearchManager(apiConfig);
+                
+                log(`✅ Search manager created, API URL: ${apiConfig.getApiUrl()}`);
+                
+                // Test basic search
+                const query = document.getElementById('testQuery').value;
+                log(`Testing performBasicSearch with query: ${query}`);
+                
+                const results = await searchManager.performBasicSearch(query, '', 3, 0, '', false, false);
+                log(`✅ Basic search completed: ${results.hits?.length || 0} hits`);
+                
+                document.getElementById('results').innerHTML = `
+                    <div class="result success">
+                        <h3>Search Manager Test: SUCCESS</h3>
+                        <p><strong>Query:</strong> ${results.query}</p>
+                        <p><strong>Hits:</strong> ${results.hits?.length || 0}</p>
+                        <p><strong>Processing Time:</strong> ${results.processing_time_ms}ms</p>
+                        ${results.hits?.length > 0 ? `<p><strong>First Result:</strong> ${results.hits[0].title || results.hits[0].pattern_model}</p>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                log(`❌ Search Manager Error: ${error.message}`);
+                log(`❌ Stack: ${error.stack}`);
+                document.getElementById('results').innerHTML = `
+                    <div class="result error">
+                        <h3>Search Manager Test: FAILED</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+        
+        log("Simple search test page loaded. Click buttons above to test different components.");
+    </script>
+</body>
+</html>

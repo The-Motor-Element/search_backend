@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Debug Test</title>
+    <script>
+        async function testDirectSearch() {
+            console.log('=== Testing Direct API Call ===');
+            try {
+                const response = await fetch('http://localhost:8001/search?q=LOADSTAR&limit=3');
+                const data = await response.json();
+                console.log('API Response:', data);
+                console.log('Number of hits:', data.hits?.length || 0);
+                
+                if (data.hits && data.hits.length > 0) {
+                    console.log('First result:', data.hits[0]);
+                    displayApiResult(data);
+                }
+            } catch (error) {
+                console.error('API test failed:', error);
+            }
+        }
+        
+        function displayApiResult(data) {
+            const container = document.getElementById('api-results');
+            if (data.hits && data.hits.length > 0) {
+                const product = data.hits[0];
+                container.innerHTML = `
+                    <h3>Direct API Result:</h3>
+                    <div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+                        <h4>${product.title || product.pattern_model || 'Unknown Product'}</h4>
+                        <p><strong>Brand:</strong> ${product.brand || 'Unknown'}</p>
+                        <p><strong>Size:</strong> ${product.size || 'N/A'}</p>
+                        <p><strong>Category:</strong> ${product.category || 'Unknown'}</p>
+                        <p><strong>Group:</strong> ${product.group || 'Unknown'}</p>
+                        <p><strong>Record Type:</strong> ${product.record_type || 'Unknown'}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function testUIElements() {
+            console.log('=== Testing UI Elements (on main page) ===');
+            
+            // Open main UI in new tab
+            const mainWindow = window.open('http://localhost:8080', '_blank');
+            
+            // Wait a bit then test elements
+            setTimeout(() => {
+                try {
+                    const elements = {
+                        searchQuery: mainWindow.document.getElementById('searchQuery'),
+                        searchResults: mainWindow.document.getElementById('searchResults'),
+                        searchType: mainWindow.document.getElementById('searchType'),
+                        limitSelect: mainWindow.document.getElementById('limitSelect')
+                    };
+                    
+                    console.log('UI Elements Check:');
+                    Object.entries(elements).forEach(([name, element]) => {
+                        console.log(`  ${name}: ${element ? '✅ Found' : '❌ Missing'}`);
+                    });
+                    
+                    // Test if app is initialized
+                    console.log('App Check:');
+                    console.log('  apolloApp:', mainWindow.apolloApp ? '✅ Found' : '❌ Missing');
+                    console.log('  searchManager:', mainWindow.apolloApp?.searchManager ? '✅ Found' : '❌ Missing');
+                    
+                    // Try to trigger a search
+                    if (elements.searchQuery && mainWindow.apolloApp?.searchManager) {
+                        console.log('Triggering test search...');
+                        elements.searchQuery.value = 'LOADSTAR';
+                        mainWindow.apolloApp.searchManager.performSearch(0);
+                    }
+                    
+                } catch (error) {
+                    console.error('UI test failed:', error);
+                }
+            }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <h1>Search Debugging Tool</h1>
+    
+    <button onclick="testDirectSearch()">Test Direct API</button>
+    <button onclick="testUIElements()">Test UI Elements</button>
+    
+    <div id="api-results" style="margin-top: 20px;">
+        <p>Click "Test Direct API" to see if the API is working</p>
+    </div>
+    
+    <div style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Click "Test Direct API" to verify the backend API is working</li>
+            <li>Click "Test UI Elements" to open the main UI and check if elements exist</li>
+            <li>Check the browser console for any JavaScript errors</li>
+        </ol>
+    </div>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Search Functionality</title>
+    <script>
+        async function testSearch() {
+            console.log('Testing search...');
+            
+            try {
+                // Test basic search
+                const response = await fetch('http://localhost:8001/search?q=LOADSTAR&limit=5');
+                const data = await response.json();
+                
+                console.log('Search Response:', data);
+                console.log('Number of hits:', data.hits?.length || 0);
+                
+                if (data.hits && data.hits.length > 0) {
+                    console.log('First result:', data.hits[0]);
+                    
+                    // Test displaying a result card
+                    const container = document.getElementById('results');
+                    const product = data.hits[0];
+                    
+                    const title = product.title || product.pattern_model || 'Unknown Product';
+                    const category = product.category || 'Unknown Category';
+                    const brand = product.brand || 'Unknown Brand';
+                    
+                    container.innerHTML = `
+                        <div class="product-card">
+                            <h3>${title}</h3>
+                            <p>Category: ${category}</p>
+                            <p>Brand: ${brand}</p>
+                            <p>Size: ${product.size || 'N/A'}</p>
+                            <p>Group: ${product.group || 'Unknown'}</p>
+                        </div>
+                    `;
+                    
+                    console.log('✅ Search results displayed successfully');
+                } else {
+                    console.log('❌ No search results found');
+                }
+                
+            } catch (error) {
+                console.error('❌ Search test failed:', error);
+            }
+        }
+        
+        // Test faceted search
+        async function testFacetedSearch() {
+            console.log('Testing faceted search...');
+            
+            try {
+                const response = await fetch('http://localhost:8001/search/facets?q=LOADSTAR&facets=group,record_type,ply_rating&limit=5');
+                const data = await response.json();
+                
+                console.log('Faceted Search Response:', data);
+                console.log('Facet distribution:', data.facet_distribution);
+                
+                if (data.facet_distribution) {
+                    const facetsContainer = document.getElementById('facets');
+                    let html = '<h3>Facets:</h3>';
+                    
+                    Object.entries(data.facet_distribution).forEach(([field, values]) => {
+                        html += `<h4>${field}:</h4><ul>`;
+                        Object.entries(values).forEach(([value, count]) => {
+                            html += `<li>${value} (${count})</li>`;
+                        });
+                        html += '</ul>';
+                    });
+                    
+                    facetsContainer.innerHTML = html;
+                    console.log('✅ Facets displayed successfully');
+                }
+                
+            } catch (error) {
+                console.error('❌ Faceted search test failed:', error);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Search Functionality Test</h1>
+    
+    <button onclick="testSearch()">Test Basic Search</button>
+    <button onclick="testFacetedSearch()">Test Faceted Search</button>
+    
+    <div id="results" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;">
+        <h3>Search Results:</h3>
+        <p>Click the button above to test search</p>
+    </div>
+    
+    <div id="facets" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;">
+        <h3>Facets:</h3>
+        <p>Click the faceted search button to test</p>
+    </div>
+</body>
+</html>

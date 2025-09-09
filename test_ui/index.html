@@ -313,7 +313,114 @@
     <script>
         // Configure API URL for different environments
         window.APOLLO_API_URL = 'http://localhost:8001';
+        
+        // Fallback search function in case main app fails to initialize
+        window.fallbackSearch = async function() {
+            console.log('🆘 Using fallback search function...');
+            
+            const query = document.getElementById('searchQuery')?.value?.trim() || '';
+            const resultsContainer = document.getElementById('searchResults');
+            
+            if (!resultsContainer) {
+                console.error('❌ Results container not found');
+                return;
+            }
+            
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            // Show loading
+            resultsContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><span class="ms-2">Searching...</span></div>';
+            
+            try {
+                const apiUrl = `http://localhost:8001/search?q=${encodeURIComponent(query)}&limit=10`;
+                console.log('🔍 Fallback API call:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ Fallback search successful:', data);
+                
+                // Display results
+                if (!data.hits || data.hits.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> No results found for "${query}".
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = `
+                    <div class="alert alert-success">
+                        <h5>Search Results (Fallback Mode)</h5>
+                        <p>Found ${data.hits.length} results for "<strong>${query}</strong>" 
+                           ${data.processing_time_ms ? `(${data.processing_time_ms}ms)` : ''}</p>
+                    </div>
+                    <div class="row">
+                `;
+                
+                data.hits.forEach(product => {
+                    const title = product.title || product.pattern_model || 'Unknown Product';
+                    const brand = product.brand || 'Unknown Brand';
+                    const size = product.size || 'N/A';
+                    const category = product.category || 'Unknown Category';
+                    const group = product.group || 'Unknown';
+                    
+                    html += `
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary">${title}</h6>
+                                    <p class="card-text">
+                                        <strong>Brand:</strong> ${brand}<br>
+                                        <strong>Size:</strong> ${size}<br>
+                                        <strong>Category:</strong> ${category}<br>
+                                        <strong>Group:</strong> ${group}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                resultsContainer.innerHTML = html;
+                
+                console.log(`✅ Displayed ${data.hits.length} results via fallback`);
+                
+            } catch (error) {
+                console.error('❌ Fallback search failed:', error);
+                resultsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Search Error</h5>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p><strong>Query:</strong> "${query}"</p>
+                    </div>
+                `;
+            }
+        };
+        
+        // Override performSearch if it doesn't exist after 3 seconds
+        setTimeout(() => {
+            if (typeof window.performSearch !== 'function') {
+                console.warn('⚠️ Main performSearch not available, using fallback');
+                window.performSearch = window.fallbackSearch;
+            }
+        }, 3000);
     </script>
-    <script src="script.js"></script>
+    <!-- Modular JavaScript architecture -->
+    <script src="js/api-config.js"></script>
+    <script src="js/health-checker.js"></script>
+    <script src="js/search-manager.js"></script>
+    <script src="js/event-handler.js"></script>
+    <script src="js/filter-manager.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
