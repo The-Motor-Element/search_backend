@@ -70,19 +70,19 @@
                                     <div class="accordion-body">
                                         <div class="mb-2">
                                             <label class="form-label">Group</label>
-                                            <select id="groupFilter" class="form-select form-select-sm">
+                                            <select id="groupFilter" class="form-select form-select-sm" data-facet-key="group">
                                                 <option value="">All Groups</option>
                                             </select>
                                         </div>
                                         <div class="mb-2">
                                             <label class="form-label">Record Type</label>
-                                            <select id="recordTypeFilter" class="form-select form-select-sm">
+                                            <select id="recordTypeFilter" class="form-select form-select-sm" data-facet-key="record_type">
                                                 <option value="">All Types</option>
                                             </select>
                                         </div>
                                         <div class="mb-2">
                                             <label class="form-label">Ply Rating</label>
-                                            <select id="plyRatingFilter" class="form-select form-select-sm">
+                                            <select id="plyRatingFilter" class="form-select form-select-sm" data-facet-key="ply_rating">
                                                 <option value="">All Ratings</option>
                                             </select>
                                         </div>
@@ -134,24 +134,6 @@
 
             <!-- Main Content Area -->
             <div class="col-md-9">
-                <!-- Selected Facets Display -->
-                <div id="selectedFacetsContainer" class="mb-3" style="display: none;">
-                    <div class="card">
-                        <div class="card-body py-2">
-                            <div class="d-flex align-items-center flex-wrap">
-                                <span class="text-muted me-2">
-                                    <i class="fas fa-filter"></i> Active Filters:
-                                </span>
-                                <div id="selectedFacetsTags" class="d-flex flex-wrap gap-1">
-                                    <!-- Selected facet tags will be added here -->
-                                </div>
-                                <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="clearAllFilters()" id="clearAllBtn">
-                                    <i class="fas fa-times"></i> Clear All
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Search Results Header -->
                 <div class="card">
@@ -222,18 +204,8 @@
                 <!-- Alert for System Messages -->
                 <div id="alertContainer"></div>
 
-                <!-- Selected Facets Display -->
-                <div id="selectedFacetsContainer" class="selected-facets-container" style="display: none;">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="text-muted small">Active Filters:</span>
-                        <div id="selectedFacetsTags" class="d-flex flex-wrap gap-1">
-                            <!-- Selected facet tags will be inserted here -->
-                        </div>
-                        <button class="btn btn-outline-secondary btn-sm ms-2" onclick="clearAllFilters()" title="Clear all filters">
-                            <i class="fas fa-times"></i> Clear All
-                        </button>
-                    </div>
-                </div>
+                <!-- Facet Tags Container (will be created by facetTags.js) -->
+                <div id="facet-tags-container"></div>
 
                 <!-- Search Results -->
                 <div id="searchResults" class="mt-3">
@@ -319,6 +291,7 @@
         }
         console.log('🔗 API Base URL configured as:', window.APOLLO_API_URL);
     </script>
+    <script src="facetTags.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

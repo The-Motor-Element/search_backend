@@ -6,7 +6,39 @@ let currentPage = 0;
 let currentQuery = '';
 let currentFilters = '';
 let similarProductsCache = {};
-let selectedFacets = {}; // Track selected facets
+
+// triggerSearch function for facetTags.js integration
+function triggerSearch(facets) {
+    console.log('🔍 triggerSearch called with facets:', facets);
+    
+    // Update the filter dropdowns to match selected facets
+    if (facets.group && Array.isArray(facets.group)) {
+        document.getElementById('groupFilter').value = facets.group[0] || '';
+    } else if (facets.group) {
+        document.getElementById('groupFilter').value = facets.group;
+    } else {
+        document.getElementById('groupFilter').value = '';
+    }
+    
+    if (facets.record_type && Array.isArray(facets.record_type)) {
+        document.getElementById('recordTypeFilter').value = facets.record_type[0] || '';
+    } else if (facets.record_type) {
+        document.getElementById('recordTypeFilter').value = facets.record_type;
+    } else {
+        document.getElementById('recordTypeFilter').value = '';
+    }
+    
+    if (facets.ply_rating && Array.isArray(facets.ply_rating)) {
+        document.getElementById('plyRatingFilter').value = facets.ply_rating[0] || '';
+    } else if (facets.ply_rating) {
+        document.getElementById('plyRatingFilter').value = facets.ply_rating;
+    } else {
+        document.getElementById('plyRatingFilter').value = '';
+    }
+    
+    // Trigger the search
+    performSearch();
+}
 
 // Enhanced fetch with better error handling for cloudflared
 async function safeFetch(url, options = {}) {
@@ -136,15 +168,6 @@ async function loadFilterOptions() {
             console.warn('⚠️ Failed to load ply ratings:', plyRatingsResult.error);
         }
         
-        // Load brands
-        const brandsResult = await safeFetch(`${API_BASE_URL}/search/filters/brands`);
-        if (brandsResult.success) {
-            populateFilterSelect('brandFilter', brandsResult.data.brands);
-            console.log(`✅ Loaded ${brandsResult.data.brands.length} brands:`, brandsResult.data.brands);
-        } else {
-            console.warn('⚠️ Failed to load brands:', brandsResult.error);
-        }
-        
     } catch (error) {
         console.error('❌ Failed to load filter options:', error);
         showAlert(`Failed to load filter options: ${error.message}`, 'warning');
@@ -153,6 +176,11 @@ async function loadFilterOptions() {
 
 function populateFilterSelect(selectId, options) {
     const select = document.getElementById(selectId);
+    if (!select) {
+        console.error(`❌ Select element not found: ${selectId}`);
+        return;
+    }
+    
     const currentValue = select.value;
     
     // Clear existing options except the first one
@@ -160,11 +188,25 @@ function populateFilterSelect(selectId, options) {
         select.removeChild(select.lastChild);
     }
     
-    options.forEach(option => {
-        const optionElement = document.createElement('option');
-        optionElement.value = option.value;
-        optionElement.textContent = `${option.value} (${option.count})`;
-        select.appendChild(optionElement);
+    if (!options || !Array.isArray(options)) {
+        console.warn(`⚠️ Invalid options for ${selectId}:`, options);
+        return;
+    }
+    
+    options.forEach((option, index) => {
+        try {
+            if (!option || typeof option !== 'object' || !option.value) {
+                console.warn(`⚠️ Invalid option at index ${index} for ${selectId}:`, option);
+                return;
+            }
+            
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = `${option.value} (${option.count || 0})`;
+            select.appendChild(optionElement);
+        } catch (error) {
+            console.error(`❌ Error adding option at index ${index} for ${selectId}:`, error, option);
+        }
     });
     
     // Restore previous value if it still exists
@@ -245,30 +287,6 @@ function setupEventListeners() {
         const element = document.getElementById(id);
         if (element) {
             element.addEventListener('change', () => {
-                // Sync selected facets when dropdowns change
-                if (id === 'groupFilter') {
-                    if (element.value) {
-                        selectedFacets['group'] = element.value;
-                    } else {
-                        delete selectedFacets['group'];
-                    }
-                } else if (id === 'recordTypeFilter') {
-                    if (element.value) {
-                        selectedFacets['record_type'] = element.value;
-                    } else {
-                        delete selectedFacets['record_type'];
-                    }
-                } else if (id === 'plyRatingFilter') {
-                    if (element.value) {
-                        selectedFacets['ply_rating'] = element.value;
-                    } else {
-                        delete selectedFacets['ply_rating'];
-                    }
-                }
-                
-                // Update selected facets display
-                updateSelectedFacetsDisplay();
-                
                 if (currentQuery || getCurrentFilters()) {
                     performSearch();
                 }
@@ -438,6 +456,14 @@ async function performSearch(page = 0) {
         }
         
         displaySearchResults(searchResults);
+        
+        // Display facets for faceted searches
+        if (searchType === 'faceted' || searchType === 'browse') {
+            if (searchResults.facet_distribution) {
+                displayFacets(searchResults.facet_distribution);
+            }
+        }
+        
         updatePagination(searchResults, limit);
         
         // Load similar products for first result
@@ -492,10 +518,6 @@ async function performFacetedSearch(query, filters, limit, offset, sort) {
     if (!result.success) {
         throw new Error(result.error || 'Faceted search failed');
     }
-    return result.data;
-    
-    // Display facets
-    displayFacets(result.data.facet_distribution);
     
     return result.data;
 }
@@ -749,9 +771,16 @@ function displayFacets(facetDistribution) {
     
     container.innerHTML = Object.entries(facetDistribution).map(([facetName, values]) => {
         const items = Object.entries(values).map(([value, count]) => 
-            `<div class="facet-item" onclick="applyFacetFilter('${facetName}', '${value}')">
-                <span>${value}</span>
-                <span class="facet-count">${count}</span>
+            `<div class="facet-item">
+                <input type="checkbox" 
+                       data-facet-key="${facetName}" 
+                       data-facet-value="${value}" 
+                       id="facet-${facetName}-${value.replace(/\s+/g, '-')}"
+                       class="form-check-input me-2">
+                <label for="facet-${facetName}-${value.replace(/\s+/g, '-')}" class="form-check-label">
+                    ${value}
+                    <span class="facet-count">${count}</span>
+                </label>
             </div>`
         ).join('');
         
@@ -764,95 +793,8 @@ function displayFacets(facetDistribution) {
     }).join('');
 }
 
-function applyFacetFilter(facetName, value) {
-    // Add to selected facets
-    selectedFacets[facetName] = value;
-    
-    // Update the appropriate filter select
-    const filterMap = {
-        'group': 'groupFilter',
-        'record_type': 'recordTypeFilter', 
-        'ply_rating': 'plyRatingFilter'
-    };
-    
-    const selectId = filterMap[facetName];
-    if (selectId) {
-        document.getElementById(selectId).value = value;
-    }
-    
-    // Update selected facets display
-    updateSelectedFacetsDisplay();
-    
-    // Perform search
-    performSearch();
-}
-
-// Add selected facets management functions
-function updateSelectedFacetsDisplay() {
-    const container = document.getElementById('selectedFacetsContainer');
-    const tagsContainer = document.getElementById('selectedFacetsTags');
-    
-    if (Object.keys(selectedFacets).length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-    
-    container.style.display = 'block';
-    
-    const tags = Object.entries(selectedFacets).map(([facetName, value]) => {
-        const displayName = facetName.replace('_', ' ').toUpperCase();
-        return `
-            <div class="selected-facet-tag">
-                <span class="selected-facet-label">${displayName}:</span>
-                <span class="selected-facet-value">${value}</span>
-                <button class="remove-facet" onclick="removeFacetFilter('${facetName}')" title="Remove filter">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-    }).join('');
-    
-    tagsContainer.innerHTML = tags;
-}
-
-function removeFacetFilter(facetName) {
-    console.log('Removing facet:', facetName);
-    console.log('Before removal:', selectedFacets);
-    
-    // Remove from selected facets
-    delete selectedFacets[facetName];
-    
-    console.log('After removal:', selectedFacets);
-    
-    // Clear the corresponding filter select
-    const filterMap = {
-        'group': 'groupFilter',
-        'record_type': 'recordTypeFilter', 
-        'ply_rating': 'plyRatingFilter'
-    };
-    
-    const selectId = filterMap[facetName];
-    if (selectId) {
-        const selectElement = document.getElementById(selectId);
-        if (selectElement) {
-            selectElement.value = '';
-            console.log('Cleared dropdown:', selectId);
-        }
-    }
-    
-    // Update display
-    updateSelectedFacetsDisplay();
-    
-    // Perform search
-    performSearch();
-}
-
 function clearAllFilters() {
     console.log('Clearing all filters');
-    console.log('Before clear:', selectedFacets);
-    
-    // Clear selected facets
-    selectedFacets = {};
     
     // Clear all filter selects
     document.getElementById('groupFilter').value = '';
@@ -860,14 +802,12 @@ function clearAllFilters() {
     document.getElementById('plyRatingFilter').value = '';
     document.getElementById('customFilter').value = '';
     
-    console.log('After clear:', selectedFacets);
-    console.log('Cleared all dropdowns');
+    // Clear facet tags using the FacetTags module
+    if (window.FacetTags) {
+        window.FacetTags.clearAllFacetTags();
+    }
     
-    // Update display
-    updateSelectedFacetsDisplay();
-    
-    // Perform search
-    performSearch();
+    console.log('Cleared all dropdowns and facet tags');
 }
 
 async function loadSimilarProducts(productId) {
