@@ -161,3 +161,10 @@ tmp/
 *~
 *.swp
 *.swo
+
+# Cloudflared temporary files
+*tunnel.log
+team-access-info.txt
+stop-tunnels.sh
+cloudflared-urls.txt
+test_ui/cloudflared-config.js

@@ -8,8 +8,51 @@ let currentFilters = '';
 let similarProductsCache = {};
 let selectedFacets = {}; // Track selected facets
 
+// Enhanced fetch with better error handling for cloudflared
+async function safeFetch(url, options = {}) {
+    try {
+        console.log(`🌐 Making request to: ${url}`);
+        
+        const fetchOptions = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            mode: 'cors',
+            cache: 'no-cache',
+            ...options
+        };
+        
+        const response = await fetch(url, fetchOptions);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Request successful: ${url}`);
+        return { success: true, data };
+        
+    } catch (error) {
+        console.error(`❌ Request failed: ${url}`, error);
+        return { 
+            success: false, 
+            error: error.message,
+            details: {
+                url,
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            }
+        };
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Multi-Brand Tire Search UI initializing...');
+    console.log('🔗 API Base URL:', API_BASE_URL);
     initializeApp();
 });
 
@@ -36,44 +79,75 @@ async function initializeApp() {
 
 async function checkSystemHealth() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        const health = await response.json();
+        console.log('🏥 Checking system health...');
+        const result = await safeFetch(`${API_BASE_URL}/health`);
         
         const statusElement = document.getElementById('health-status');
-        if (health.status === 'healthy') {
+        
+        if (result.success && result.data.status === 'healthy') {
             statusElement.innerHTML = '<i class="fas fa-check-circle"></i> System Healthy';
             statusElement.className = 'badge bg-success';
+            console.log('✅ System health check passed');
         } else {
             statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> System Issues';
             statusElement.className = 'badge bg-warning';
+            console.warn('⚠️ System health check failed:', result.error || 'Unknown error');
         }
     } catch (error) {
+        console.error('❌ Health check error:', error);
         const statusElement = document.getElementById('health-status');
-        statusElement.innerHTML = '<i class="fas fa-times-circle"></i> System Offline';
+        statusElement.innerHTML = '<i class="fas fa-times-circle"></i> Connection Failed';
         statusElement.className = 'badge bg-danger';
+        
+        // Show detailed error information for debugging
+        showAlert(`Connection failed: ${error.message}. Check console for details.`, 'danger');
         throw error;
     }
 }
 
 async function loadFilterOptions() {
     try {
+        console.log('🔍 Loading filter options...');
+        
         // Load groups
-        const groupsResponse = await fetch(`${API_BASE_URL}/search/filters/groups`);
-        const groupsData = await groupsResponse.json();
-        populateFilterSelect('groupFilter', groupsData.groups);
+        const groupsResult = await safeFetch(`${API_BASE_URL}/search/filters/groups`);
+        if (groupsResult.success) {
+            populateFilterSelect('groupFilter', groupsResult.data.groups);
+            console.log(`✅ Loaded ${groupsResult.data.groups.length} groups`);
+        } else {
+            console.warn('⚠️ Failed to load groups:', groupsResult.error);
+        }
         
         // Load record types
-        const recordTypesResponse = await fetch(`${API_BASE_URL}/search/filters/record-types`);
-        const recordTypesData = await recordTypesResponse.json();
-        populateFilterSelect('recordTypeFilter', recordTypesData.record_types);
+        const recordTypesResult = await safeFetch(`${API_BASE_URL}/search/filters/record-types`);
+        if (recordTypesResult.success) {
+            populateFilterSelect('recordTypeFilter', recordTypesResult.data.record_types);
+            console.log(`✅ Loaded ${recordTypesResult.data.record_types.length} record types`);
+        } else {
+            console.warn('⚠️ Failed to load record types:', recordTypesResult.error);
+        }
         
         // Load ply ratings
-        const plyRatingsResponse = await fetch(`${API_BASE_URL}/search/filters/ply-ratings`);
-        const plyRatingsData = await plyRatingsResponse.json();
-        populateFilterSelect('plyRatingFilter', plyRatingsData.ply_ratings);
+        const plyRatingsResult = await safeFetch(`${API_BASE_URL}/search/filters/ply-ratings`);
+        if (plyRatingsResult.success) {
+            populateFilterSelect('plyRatingFilter', plyRatingsResult.data.ply_ratings);
+            console.log(`✅ Loaded ${plyRatingsResult.data.ply_ratings.length} ply ratings`);
+        } else {
+            console.warn('⚠️ Failed to load ply ratings:', plyRatingsResult.error);
+        }
+        
+        // Load brands
+        const brandsResult = await safeFetch(`${API_BASE_URL}/search/filters/brands`);
+        if (brandsResult.success) {
+            populateFilterSelect('brandFilter', brandsResult.data.brands);
+            console.log(`✅ Loaded ${brandsResult.data.brands.length} brands:`, brandsResult.data.brands);
+        } else {
+            console.warn('⚠️ Failed to load brands:', brandsResult.error);
+        }
         
     } catch (error) {
-        console.error('Failed to load filter options:', error);
+        console.error('❌ Failed to load filter options:', error);
+        showAlert(`Failed to load filter options: ${error.message}`, 'warning');
     }
 }
 
@@ -225,16 +299,15 @@ function updateSuggestionSelection(suggestions, selectedIndex) {
 async function getSuggestions(query) {
     try {
         console.log('🔍 Getting suggestions for:', query);
-        const response = await fetch(`${API_BASE_URL}/search/suggestions?q=${encodeURIComponent(query)}&limit=5`);
+        const result = await safeFetch(`${API_BASE_URL}/search/suggestions?q=${encodeURIComponent(query)}&limit=5`);
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to get suggestions');
         }
         
-        const data = await response.json();
-        console.log('💡 Received suggestions:', data.suggestions);
+        console.log('💡 Received suggestions:', result.data.suggestions);
         
-        showSuggestions(data.suggestions || []);
+        showSuggestions(result.data.suggestions || []);
     } catch (error) {
         console.error('❌ Failed to get suggestions:', error);
         hideSuggestions();
@@ -396,8 +469,11 @@ async function performBasicSearch(query, filters, limit, offset, sort, highlight
     }
     if (showMatches) params.append('show_matches_position', 'true');
     
-    const response = await fetch(`${API_BASE_URL}/search?${params}`);
-    return await response.json();
+    const result = await safeFetch(`${API_BASE_URL}/search?${params}`);
+    if (!result.success) {
+        throw new Error(result.error || 'Search failed');
+    }
+    return result.data;
 }
 
 async function performFacetedSearch(query, filters, limit, offset, sort) {
@@ -412,13 +488,16 @@ async function performFacetedSearch(query, filters, limit, offset, sort) {
     if (filters) params.append('filters', filters);
     if (sort) params.append('sort', sort);
     
-    const response = await fetch(`${API_BASE_URL}/search/facets?${params}`);
-    const data = await response.json();
+    const result = await safeFetch(`${API_BASE_URL}/search/facets?${params}`);
+    if (!result.success) {
+        throw new Error(result.error || 'Faceted search failed');
+    }
+    return result.data;
     
     // Display facets
-    displayFacets(data.facet_distribution);
+    displayFacets(result.data.facet_distribution);
     
-    return data;
+    return result.data;
 }
 
 async function performHighlightedSearch(query, filters, limit, offset, sort, forceHighlight = false) {
@@ -433,8 +512,11 @@ async function performHighlightedSearch(query, filters, limit, offset, sort, for
     if (filters) params.append('filters', filters);
     if (sort) params.append('sort', sort);
     
-    const response = await fetch(`${API_BASE_URL}/search?${params}`);
-    return await response.json();
+    const result = await safeFetch(`${API_BASE_URL}/search?${params}`);
+    if (!result.success) {
+        throw new Error(result.error || 'Highlighted search failed');
+    }
+    return result.data;
 }
 
 async function performCroppedSearch(query, filters, limit, offset, sort) {
@@ -450,8 +532,11 @@ async function performCroppedSearch(query, filters, limit, offset, sort) {
     if (filters) params.append('filters', filters);
     if (sort) params.append('sort', sort);
     
-    const response = await fetch(`${API_BASE_URL}/search?${params}`);
-    return await response.json();
+    const result = await safeFetch(`${API_BASE_URL}/search?${params}`);
+    if (!result.success) {
+        throw new Error(result.error || 'Cropped search failed');
+    }
+    return result.data;
 }
 
 function displaySearchResults(results) {
@@ -792,13 +877,18 @@ async function loadSimilarProducts(productId) {
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/search/similar/${productId}?limit=3`);
-        const data = await response.json();
+        const result = await safeFetch(`${API_BASE_URL}/search/similar/${productId}?limit=3`);
         
-        similarProductsCache[productId] = data;
-        displaySimilarProducts(data);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load similar products');
+        }
+        
+        similarProductsCache[productId] = result.data.hits || [];
+        displaySimilarProducts(similarProductsCache[productId]);
+        
     } catch (error) {
-        console.error('Failed to load similar products:', error);
+        console.error('❌ Error loading similar products:', error);
+        showAlert(`Failed to load similar products: ${error.message}`, 'warning');
     }
 }
 
@@ -911,13 +1001,16 @@ function browseMode() {
 
 async function showAnalytics() {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/stats`);
-        const data = await response.json();
+        const result = await safeFetch(`${API_BASE_URL}/analytics/stats`);
         
-        displayAnalyticsModal(data);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load analytics');
+        }
+        
+        displayAnalyticsModal(result.data);
     } catch (error) {
-        console.error('Failed to load analytics:', error);
-        showAlert('Failed to load analytics data', 'danger');
+        console.error('❌ Failed to load analytics:', error);
+        showAlert(`Failed to load analytics data: ${error.message}`, 'danger');
     }
 }
 

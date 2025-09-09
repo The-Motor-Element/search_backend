@@ -319,6 +319,21 @@ docker-compose up -d api
 - [ ] Test API: Visit http://localhost:8001/docs
 - [ ] Test UI: Visit http://localhost:8080
 - [ ] Run tests: `pytest tests/ -v`
+- [ ] **Optional**: Share with team using `./quick-share.sh` (see [CLOUDFLARED.md](CLOUDFLARED.md))
+
+## 🌐 Team Sharing
+
+Want to share your tire search with your team? Use Cloudflare Tunnels:
+
+```bash
+# Quick temporary sharing
+./quick-share.sh
+
+# Or persistent team access  
+./cloudflared-setup.sh
+```
+
+See [CLOUDFLARED.md](CLOUDFLARED.md) for detailed setup instructions.
 
 ## 📚 Learn More
 
