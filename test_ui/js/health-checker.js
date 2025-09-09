@@ -60,7 +60,7 @@ class HealthChecker {
                     this.apiConfig.updateApiUrl(apiUrl);
                 }
                 
-                const healthUrl = this.apiConfig.getEndpoint('health');
+                const healthUrl = `${this.apiConfig.getApiUrl()}/health`;
                 console.log(`🩺 Health check URL: ${healthUrl}`);
                 console.log(`🔧 Fetch options: {method: 'GET', headers: {}, mode: 'cors'}`);
                 
@@ -127,29 +127,18 @@ class HealthChecker {
             return;
         }
         
-        // Clear existing classes
-        this.statusElement.className = 'alert';
+        // Clear existing classes and content
+        this.statusElement.className = 'badge';
         
         if (status === 'healthy') {
-            this.statusElement.classList.add('alert-success');
-            this.statusElement.innerHTML = `
-                <i class="fas fa-check-circle"></i> 
-                <strong>System Online</strong> - All services operational
-                ${data.meilisearch ? `<br><small>Search Engine: ${data.meilisearch.status} (v${data.meilisearch.version})</small>` : ''}
-            `;
+            this.statusElement.classList.add('bg-success');
+            this.statusElement.innerHTML = '<i class="fas fa-check-circle"></i> System Healthy';
         } else if (status === 'offline') {
-            this.statusElement.classList.add('alert-danger');
-            this.statusElement.innerHTML = `
-                <i class="fas fa-exclamation-triangle"></i> 
-                <strong>System Offline</strong> - Please check connection
-                ${data.error ? `<br><small>Error: ${data.error}</small>` : ''}
-            `;
+            this.statusElement.classList.add('bg-danger');
+            this.statusElement.innerHTML = '<i class="fas fa-times-circle"></i> System Offline';
         } else {
-            this.statusElement.classList.add('alert-warning');
-            this.statusElement.innerHTML = `
-                <i class="fas fa-clock"></i> 
-                <strong>System Status Unknown</strong> - Checking...
-            `;
+            this.statusElement.classList.add('bg-warning');
+            this.statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> System Issues';
         }
     }
 

@@ -9,17 +9,17 @@ class FilterManager {
     async loadFilterOptions() {
         try {
             // Load groups
-            const groupsResponse = await fetch(this.apiConfig.getEndpoint('search/filters/groups'));
+            const groupsResponse = await fetch(`${this.apiConfig.getApiUrl()}/search/filters/groups`);
             const groupsData = await groupsResponse.json();
             this.populateFilterSelect('groupFilter', groupsData.groups);
             
             // Load record types
-            const recordTypesResponse = await fetch(this.apiConfig.getEndpoint('search/filters/record-types'));
+            const recordTypesResponse = await fetch(`${this.apiConfig.getApiUrl()}/search/filters/record-types`);
             const recordTypesData = await recordTypesResponse.json();
             this.populateFilterSelect('recordTypeFilter', recordTypesData.record_types);
             
             // Load ply ratings
-            const plyRatingsResponse = await fetch(this.apiConfig.getEndpoint('search/filters/ply-ratings'));
+            const plyRatingsResponse = await fetch(`${this.apiConfig.getApiUrl()}/search/filters/ply-ratings`);
             const plyRatingsData = await plyRatingsResponse.json();
             this.populateFilterSelect('plyRatingFilter', plyRatingsData.ply_ratings);
             
@@ -73,8 +73,8 @@ class FilterManager {
                 }
                 
                 // Trigger search with the updated filters
-                if (window.apolloApp && window.apolloApp.searchManager) {
-                    window.apolloApp.searchManager.performSearch(0);
+                if (window.performSearch) {
+                    window.performSearch(0);
                 }
             }
         }

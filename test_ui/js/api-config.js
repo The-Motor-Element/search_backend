@@ -61,7 +61,7 @@ class ApiConfig {
     }
 
     getApiUrl() {
-        return window.API_BASE_URL || this.baseUrl;
+        return this.baseUrl;
     }
 
     updateApiUrl(newUrl) {
@@ -104,3 +104,6 @@ class ApiConfig {
 
 // Create global API configuration instance
 window.apiConfig = new ApiConfig();
+
+// Set global API_BASE_URL for backward compatibility
+window.API_BASE_URL = window.apiConfig.getApiUrl();

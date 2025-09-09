@@ -8,7 +8,7 @@ class Analytics {
 
     async showAnalytics() {
         try {
-            const response = await fetch(this.apiConfig.getEndpoint('analytics/stats'));
+            const response = await fetch(`${this.apiConfig.getApiUrl()}/analytics/stats`);
             const data = await response.json();
             
             this.displayAnalyticsModal(data);

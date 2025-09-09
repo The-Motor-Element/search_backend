@@ -108,9 +108,10 @@ class ApolloSearchApp {
         window.applyFacetFilter = (facetName, value) => this.searchManager.applyFacetFilter(facetName, value);
         window.removeFacetFilter = (facetName) => this.searchManager.removeFacetFilter(facetName);
         window.clearAllFilters = () => this.searchManager.clearAllFilters();
+        window.updateSearchInterface = () => this.eventHandler.updateSearchInterface();
         
         // Export utility functions
-        window.showProductDetails = (productId) => console.log('Show product details for:', productId);
+        window.showProductDetails = (productId) => this.searchManager.showProductDetails(productId);
         window.findSimilarProducts = (productId) => {
             this.searchManager.loadSimilarProducts(productId);
             document.getElementById('similarProductsSection')?.scrollIntoView({ behavior: 'smooth' });
@@ -159,6 +160,16 @@ document.addEventListener('DOMContentLoaded', function() {
         limitSelect: !!document.getElementById('limitSelect')
     });
     
+    // Add a test for manual debugging
+    window.testSearch = function() {
+        console.log('🧪 Manual test search triggered');
+        const searchInput = document.getElementById('searchQuery');
+        if (searchInput) {
+            searchInput.value = 'LOADSTAR';
+            window.performSearch();
+        }
+    };
+    
     try {
         // Create and initialize the main application
         const app = new ApolloSearchApp();
@@ -167,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
         app.exportGlobalFunctions();
         console.log('✅ Global functions exported');
         console.log('✅ window.performSearch type:', typeof window.performSearch);
+        console.log('✅ window.loadSampleSearch type:', typeof window.loadSampleSearch);
         
         app.initialize();
         console.log('✅ App initialization started');

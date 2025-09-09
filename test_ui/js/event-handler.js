@@ -190,7 +190,7 @@ class EventHandler {
         
         // Create suggestion items with enhanced styling
         suggestionsContainer.innerHTML = suggestions.map((suggestion, index) => 
-            `<div class="suggestion-item" onclick="window.eventHandler.selectSuggestion('${suggestion.replace(/'/g, "\\'")}')">
+            `<div class="suggestion-item" onclick="selectSuggestion('${suggestion.replace(/'/g, "\\'")}')">
                 ${suggestion}
             </div>`
         ).join('');

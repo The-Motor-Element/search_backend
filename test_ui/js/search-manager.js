@@ -56,7 +56,7 @@ class SearchManager {
                 console.log('🔧 Added highlighting');
             }
 
-            const endpoint = `${this.apiConfig.getEndpoint('search')}?${searchParams}`;
+            const endpoint = `${this.apiConfig.getApiUrl()}/search?${searchParams}`;
             console.log('🔍 Making basic search request to:', endpoint);
             console.log('🔍 API config check:', this.apiConfig.getApiUrl());
 
@@ -190,7 +190,7 @@ class SearchManager {
             console.log('🔧 Added sort to faceted search:', sort);
         }
         
-        const endpoint = this.apiConfig.getEndpoint(`search/facets?${params}`);
+        const endpoint = `${this.apiConfig.getApiUrl()}/search/facets?${params}`;
         console.log('🔧 Faceted search endpoint:', endpoint);
         
         try {
@@ -231,7 +231,7 @@ class SearchManager {
         if (filters) params.append('filters', filters);
         if (sort) params.append('sort', sort);
         
-        const response = await fetch(this.apiConfig.getEndpoint(`search?${params}`));
+        const response = await fetch(`${this.apiConfig.getApiUrl()}/search?${params}`);
         return await response.json();
     }
 
@@ -249,7 +249,7 @@ class SearchManager {
         if (filters) params.append('filters', filters);
         if (sort) params.append('sort', sort);
         
-        const response = await fetch(this.apiConfig.getEndpoint(`search?${params}`));
+        const response = await fetch(`${this.apiConfig.getApiUrl()}/search?${params}`);
         return await response.json();
     }
 
@@ -259,43 +259,44 @@ class SearchManager {
         console.log('🔍 Window location:', window.location.href);
         console.log('🔍 API config:', this.apiConfig.getApiUrl());
         
-        const query = document.getElementById('searchQuery')?.value?.trim() || '';
-        const searchType = document.getElementById('searchType')?.value || 'faceted';
-        const limit = parseInt(document.getElementById('limitSelect')?.value || '20');
-        const offset = page * limit;
-        const filters = this.getCurrentFilters();
-        const sort = document.getElementById('sortField')?.value || '';
-        const highlight = document.getElementById('highlightResults')?.checked || false;
-        const showMatches = document.getElementById('showMatchPositions')?.checked || false;
-        
-        console.log('🔍 Search parameters:', { query, searchType, limit, offset, filters, sort, highlight, showMatches });
-        
-        // Check if required elements exist
-        const requiredElements = {
-            searchQuery: document.getElementById('searchQuery'),
-            searchResults: document.getElementById('searchResults'),
-            searchType: document.getElementById('searchType')
-        };
-        
-        console.log('🔍 Element availability:', Object.entries(requiredElements).map(([name, element]) => 
-            `${name}: ${element ? '✅' : '❌'}`
-        ).join(', '));
-        
-        this.currentQuery = query;
-        this.currentFilters = filters;
-        this.currentPage = page;
-        
-        // Hide welcome card if it exists
-        const welcomeCard = document.getElementById('welcomeCard');
-        if (welcomeCard) {
-            welcomeCard.style.display = 'none';
-        }
-        
-        // Show loading
-        this.showLoading();
-        console.log('🔧 Loading state shown');
-        
         try {
+            const query = document.getElementById('searchQuery')?.value?.trim() || '';
+            const searchType = document.getElementById('searchType')?.value || 'faceted';
+            const limit = parseInt(document.getElementById('limitSelect')?.value || '20');
+            const offset = page * limit;
+            const filters = this.getCurrentFilters();
+            const sort = document.getElementById('sortField')?.value || '';
+            const highlight = document.getElementById('highlightResults')?.checked || false;
+            const showMatches = document.getElementById('showMatchPositions')?.checked || false;
+            
+            console.log('🔍 Search parameters:', { query, searchType, limit, offset, filters, sort, highlight, showMatches });
+            
+            // Check if required elements exist
+            const requiredElements = {
+                searchQuery: document.getElementById('searchQuery'),
+                searchResults: document.getElementById('searchResults'),
+                searchType: document.getElementById('searchType')
+            };
+            
+            console.log('🔍 Element availability:', Object.entries(requiredElements).map(([name, element]) => 
+                `${name}: ${element ? '✅' : '❌'}`
+            ).join(', '));
+            
+            this.currentQuery = query;
+            this.currentFilters = filters;
+            this.currentPage = page;
+            
+            // Hide welcome card if it exists
+            const welcomeCard = document.getElementById('welcomeCard');
+            if (welcomeCard) {
+                welcomeCard.style.display = 'none';
+                console.log('🔍 Welcome card hidden');
+            }
+            
+            // Show loading
+            this.showLoading();
+            console.log('🔧 Loading state shown');
+            
             let searchResults;
             console.log('🔧 About to determine search type and call appropriate method...');
             
@@ -323,6 +324,13 @@ class SearchManager {
             }
             
             console.log('🔧 Search method completed, about to display results...');
+            console.log('🔧 Search results structure:', {
+                hasResults: !!searchResults,
+                hasHits: !!(searchResults && searchResults.hits),
+                hitsCount: searchResults && searchResults.hits ? searchResults.hits.length : 'N/A',
+                totalHits: searchResults ? searchResults.estimated_total_hits : 'N/A'
+            });
+            
             this.displaySearchResults(searchResults);
             console.log('🔧 displaySearchResults completed');
             
@@ -345,9 +353,6 @@ class SearchManager {
             console.error('❌ Error details:', {
                 message: error.message,
                 stack: error.stack,
-                query: query,
-                searchType: searchType,
-                filters: filters,
                 apiUrl: this.apiConfig.getApiUrl()
             });
             
@@ -358,8 +363,6 @@ class SearchManager {
                     <div class="alert alert-danger">
                         <h5><i class="fas fa-exclamation-triangle"></i> Search Error</h5>
                         <p><strong>Error:</strong> ${error.message}</p>
-                        <p><strong>Query:</strong> "${query}"</p>
-                        <p><strong>Search Type:</strong> ${searchType}</p>
                         <p><strong>API URL:</strong> ${this.apiConfig.getApiUrl()}</p>
                         <details>
                             <summary>Technical Details</summary>
@@ -378,7 +381,7 @@ class SearchManager {
     async getSuggestions(query) {
         try {
             console.log('🔍 Getting suggestions for:', query);
-            const response = await fetch(this.apiConfig.getEndpoint(`search/suggestions?q=${encodeURIComponent(query)}&limit=5`));
+            const response = await fetch(`${this.apiConfig.getApiUrl()}/search/suggestions?q=${encodeURIComponent(query)}&limit=5`);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -402,7 +405,7 @@ class SearchManager {
         }
         
         try {
-            const response = await fetch(this.apiConfig.getEndpoint(`search/similar/${productId}?limit=3`));
+            const response = await fetch(`${this.apiConfig.getApiUrl()}/search/similar/${productId}?limit=3`);
             const data = await response.json();
             
             this.similarProductsCache[productId] = data;
@@ -557,148 +560,237 @@ class SearchManager {
 
     // Display methods for UI rendering
     displaySearchResults(results) {
-        console.log('📊 Displaying search results:', results);
-        console.log('📊 Results structure check:', {
-            hasResults: !!results,
-            hasHits: !!(results && results.hits),
-            hitsLength: results && results.hits ? results.hits.length : 'N/A',
-            query: results ? results.query : 'N/A'
+        console.log('📊 displaySearchResults called with:', results);
+        console.log('📊 Results type:', typeof results);
+        console.log('📊 Results keys:', Object.keys(results || {}));
+        console.log('📊 Hits array:', results?.hits);
+        console.log('📊 Hits length:', results?.hits?.length);
+        
+        const container = document.getElementById('searchResults');
+        const resultsCount = document.getElementById('resultsCount');
+        const processingTime = document.getElementById('processingTime');
+        
+        console.log('📊 DOM elements found:', {
+            container: !!container,
+            resultsCount: !!resultsCount,
+            processingTime: !!processingTime
         });
         
-        const resultsContainer = document.getElementById('searchResults');
-        if (!resultsContainer) {
-            console.error('❌ Search results container not found');
+        if (!container || !resultsCount || !processingTime) {
+            console.error('❌ Required DOM elements not found');
+            console.error('❌ Missing elements:', {
+                container: !container ? 'searchResults' : null,
+                resultsCount: !resultsCount ? 'resultsCount' : null,
+                processingTime: !processingTime ? 'processingTime' : null
+            });
             return;
         }
         
-        console.log('📊 Found results container:', resultsContainer);
+        console.log('📊 Setting results count and processing time...');
+        resultsCount.textContent = results.estimated_total_hits || results.hits.length;
+        processingTime.textContent = `${results.processing_time_ms}ms`;
         
-        // Clear previous results
-        resultsContainer.innerHTML = '';
-        
-        if (!results.hits || results.hits.length === 0) {
-            resultsContainer.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> No results found for "${results.query}". Try adjusting your search terms or filters.
+        if (results.hits.length === 0) {
+            console.log('📊 No results found, showing empty state');
+            container.innerHTML = `
+                <div class="card text-center">
+                    <div class="card-body py-5">
+                        <i class="fas fa-search fa-2x text-muted mb-3"></i>
+                        <h4>No results found</h4>
+                        <p class="text-muted">Try adjusting your search terms or filters</p>
+                    </div>
                 </div>
             `;
             return;
         }
         
-        // Create results HTML
-        let html = `
-            <div class="search-summary mb-3">
-                <h5>Search Results</h5>
-                <p class="text-muted">
-                    Found ${results.estimated_total_hits || results.hits.length} results for 
-                    <strong>"${results.query}"</strong>
-                    ${results.processing_time_ms ? `(${results.processing_time_ms}ms)` : ''}
-                </p>
-            </div>
-            <div class="row">
-        `;
+        console.log('📊 About to create product cards for', results.hits.length, 'results');
+        console.log('📊 First result sample:', results.hits[0]);
         
-        // Add each result
-        results.hits.forEach((hit, index) => {
-            html += this.createProductCard(hit, index);
-        });
-        
-        html += '</div>';
-        
-        // Set the HTML
-        resultsContainer.innerHTML = html;
-        
-        // Hide loading
-        this.hideLoading();
-        
-        console.log(`✅ Displayed ${results.hits.length} search results`);
+        try {
+            const cards = results.hits.map((hit, index) => {
+                console.log(`📊 Creating card ${index + 1} for product:`, hit.id);
+                return this.createProductCard(hit);
+            });
+            console.log('📊 All cards created successfully, count:', cards.length);
+            
+            container.innerHTML = cards.join('');
+            console.log('📊 Results HTML set successfully');
+            
+        } catch (error) {
+            console.error('❌ Error creating product cards:', error);
+            console.error('❌ Error stack:', error.stack);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5>Error Displaying Results</h5>
+                    <p>Error: ${error.message}</p>
+                </div>
+            `;
+        }
     }
 
-    createProductCard(product, index) {
-        // Clean up product data
-        const title = product.title || product.pattern_model || 'Unknown Product';
-        const category = product.category || 'Unknown Category';
-        const brand = product.brand || 'Unknown Brand';
-        const size = product.size || 'N/A';
-        const group = product.group || 'Unknown';
-        const material = product.material || '';
-        const plyRating = product.ply_rating || 'N/A';
-        const speedRating = product.speed_rating || 'N/A';
-        const loadIndex = product.load_index || 'N/A';
-        const recordType = product.record_type || 'Unknown';
+    createProductCard(product) {
+        console.log('🎨 createProductCard called with:', product);
+        console.log('🎨 Product ID:', product.id);
+        console.log('🎨 Product title:', product.title);
+        console.log('🎨 Product material:', product.material);
         
-        return `
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card h-100 product-card" data-product-id="${product.id}">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="card-title mb-0">
-                            <i class="fas fa-tire"></i> ${title}
-                        </h6>
-                        <small class="text-light">${category}</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-6">
-                                <strong>Brand:</strong><br>
-                                <span class="text-primary">${brand}</span>
-                            </div>
-                            <div class="col-6">
-                                <strong>Size:</strong><br>
-                                <span class="badge bg-secondary">${size}</span>
-                            </div>
+        try {
+            const tags = product.tags ? product.tags.map(tag => 
+                `<span class="product-tag">${tag}</span>`
+            ).join('') : '';
+            
+            const highlighted = product._formatted || product;
+            
+            // Extract clean product name from material or title
+            const productName = this.extractProductName(highlighted.material || highlighted.title || product.mpn || 'Unknown Product');
+            const productSize = highlighted.size || 'Size not specified';
+            const productPattern = highlighted.pattern_model || 'Pattern not available';
+            
+            console.log('🎨 Extracted data:', { productName, productSize, productPattern });
+            
+            // Determine tire type icon
+            const tireIcon = this.getTireIcon(product.record_type, product.group);
+            
+            console.log('🎨 About to generate HTML for product:', product.id);
+            
+            const cardHtml = `
+                <div class="product-card" onclick="showProductDetails('${product.id}')">
+                    <div class="product-card-header">
+                        <div class="product-icon">
+                            <i class="${tireIcon}"></i>
                         </div>
-                        <hr>
-                        <div class="row">
-                            <div class="col-6">
-                                <strong>Group:</strong><br>
-                                <small>${group}</small>
-                            </div>
-                            <div class="col-6">
-                                <strong>Type:</strong><br>
-                                <small>${recordType}</small>
-                            </div>
+                        <div class="product-header-info">
+                            <h5 class="product-name">${productName}</h5>
+                            <p class="product-subtitle">${productSize} • ${productPattern}</p>
                         </div>
-                        ${material ? `
-                        <hr>
-                        <div>
-                            <strong>Material:</strong><br>
-                            <small class="text-muted">${material}</small>
-                        </div>
-                        ` : ''}
-                        <hr>
-                        <div class="row">
-                            <div class="col-4">
-                                <strong>Ply:</strong><br>
-                                <small>${plyRating}</small>
-                            </div>
-                            <div class="col-4">
-                                <strong>Speed:</strong><br>
-                                <small>${speedRating}</small>
-                            </div>
-                            <div class="col-4">
-                                <strong>Load:</strong><br>
-                                <small>${loadIndex}</small>
-                            </div>
+                        <div class="product-price-badge">
+                            <span class="badge bg-primary">${product.group || 'N/A'}</span>
                         </div>
                     </div>
-                    <div class="card-footer">
-                        <div class="btn-group w-100">
-                            <button class="btn btn-outline-primary btn-sm" onclick="app.searchManager.showProductDetails('${product.id}')">
-                                <i class="fas fa-info-circle"></i> Details
-                            </button>
-                            <button class="btn btn-outline-success btn-sm" onclick="app.copyProductInfo('${product.id}')">
-                                <i class="fas fa-copy"></i> Copy
-                            </button>
+                    
+                    <div class="product-card-body">
+                        <div class="product-specs">
+                            <div class="spec-item">
+                                <span class="spec-label">MPN:</span>
+                                <span class="spec-value">${highlighted.mpn || 'N/A'}</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Type:</span>
+                                <span class="spec-value">${product.record_type || 'N/A'}</span>
+                            </div>
+                            ${product.ply_rating ? `
+                            <div class="spec-item">
+                                <span class="spec-label">Ply Rating:</span>
+                                <span class="spec-value">${product.ply_rating}</span>
+                            </div>` : ''}
+                            ${product.load_index ? `
+                            <div class="spec-item">
+                                <span class="spec-label">Load Index:</span>
+                                <span class="spec-value">${product.load_index}</span>
+                            </div>` : ''}
+                            ${product.speed_rating ? `
+                            <div class="spec-item">
+                                <span class="spec-label">Speed Rating:</span>
+                                <span class="spec-value">${product.speed_rating}</span>
+                            </div>` : ''}
+                        </div>
+                        
+                        ${tags ? `<div class="product-tags mt-3">${tags}</div>` : ''}
+                        
+                        <div class="product-description mt-2">
+                            <small class="text-muted">${highlighted.material || 'No description available'}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="product-card-footer">
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); findSimilarProducts('${product.id}')">
+                            <i class="fas fa-search-plus"></i> Find Similar
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); copyProductInfo('${product.id}')">
+                            <i class="fas fa-copy"></i> Copy Info
+                        </button>
+                        <div class="product-brand">
+                            <small><i class="fas fa-trademark"></i> ${product.brand || 'Apollo'}</small>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+            
+            console.log('🎨 HTML generated successfully for:', product.id);
+            return cardHtml;
+            
+        } catch (error) {
+            console.error('❌ Error in createProductCard for product:', product.id, error);
+            console.error('❌ Error stack:', error.stack);
+            return `<div class="alert alert-danger">Error creating card for product ${product.id}: ${error.message}</div>`;
+        }
     }
 
-    displayFacets(facetDistribution) {
-        // This will be moved to ui-renderer.js
-        console.log('📊 Displaying facets:', facetDistribution);
+    extractProductName(material) {
+        // Extract a clean product name from the material description
+        if (!material) return 'Unknown Product';
+        
+        // Remove size information (numbers with / or R or D)
+        let name = material.replace(/\d+[\/.]\d+[\s\w]*[RD]\d+/g, '');
+        
+        // Remove ply rating (like 8PR, 6PR)
+        name = name.replace(/\d+PR/g, '');
+        
+        // Remove load index and speed rating patterns
+        name = name.replace(/\d+\/\d+[A-Z]/g, '');
+        name = name.replace(/\d+[A-Z]/g, '');
+        
+        // Remove special codes in parentheses or with dashes
+        name = name.replace(/\([^)]*\)/g, '');
+        name = name.replace(/-[A-Z\d]+$/g, '');
+        
+        // Clean up extra spaces and dashes
+        name = name.replace(/\s+/g, ' ').replace(/^\s*-?\s*/, '').replace(/\s*-?\s*$/, '');
+        
+        // If name is too short or empty, use the pattern model or return a default
+        if (name.length < 3) {
+            // Try to extract pattern from the original material
+            const patternMatch = material.match(/([A-Z][A-Z\s]+[A-Z])/);
+            if (patternMatch) {
+                name = patternMatch[1];
+            } else {
+                name = 'Apollo Tire Product';
+            }
+        }
+        
+        return name.trim();
+    }
+
+    getTireIcon(recordType, group) {
+        // Return appropriate icon based on tire type and group
+        if (recordType === 'Tube') return 'fas fa-circle tire-tube-icon';
+        if (recordType === 'Flaps') return 'fas fa-layer-group tire-flap-icon';
+        
+        // Different tire icons based on group
+        switch (group) {
+            case 'Passenger Car':
+            case 'PCR':
+                return 'fas fa-car tire-car-icon';
+            case 'Truck and Bus':
+            case 'TBR':
+                return 'fas fa-truck tire-truck-icon';
+            case '2 Wheeler':
+                return 'fas fa-motorcycle tire-bike-icon';
+            case '3 Wheeler':
+                return 'fas fa-taxi tire-auto-icon';
+            case 'Farm':
+                return 'fas fa-tractor tire-farm-icon';
+            case 'Industrial':
+                return 'fas fa-industry tire-industrial-icon';
+            case 'Earthmover':
+                return 'fas fa-hard-hat tire-construction-icon';
+            case 'LCV':
+            case 'SCV':
+                return 'fas fa-shipping-fast tire-commercial-icon';
+            default:
+                return 'fas fa-tire tire-default-icon';
+        }
     }
 
     displaySimilarProducts(data) {
@@ -755,7 +847,7 @@ class SearchManager {
                 <span class="badge bg-primary me-1">
                     ${this.formatFieldName(field)}: ${value}
                     <button type="button" class="btn-close btn-close-white ms-1" 
-                            onclick="window.apolloApp.searchManager.removeFacetFilter('${field}')"
+                            onclick="removeFacetFilter('${field}')"
                             style="font-size: 0.65em;"></button>
                 </span>
             `;
@@ -799,7 +891,7 @@ class SearchManager {
         // Previous button
         html += `
             <li class="page-item ${currentPage === 0 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="window.apolloApp.searchManager.performSearch(${currentPage - 1}); return false;">
+                <a class="page-link" href="#" onclick="performSearch(${currentPage - 1}); return false;">
                     Previous
                 </a>
             </li>
@@ -809,7 +901,7 @@ class SearchManager {
         for (let i = startPage; i < endPage; i++) {
             html += `
                 <li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="window.apolloApp.searchManager.performSearch(${i}); return false;">
+                    <a class="page-link" href="#" onclick="performSearch(${i}); return false;">
                         ${i + 1}
                     </a>
                 </li>
@@ -819,7 +911,7 @@ class SearchManager {
         // Next button
         html += `
             <li class="page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="window.apolloApp.searchManager.performSearch(${currentPage + 1}); return false;">
+                <a class="page-link" href="#" onclick="performSearch(${currentPage + 1}); return false;">
                     Next
                 </a>
             </li>
