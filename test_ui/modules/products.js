@@ -17,10 +17,10 @@ export async function loadSimilarProducts(productId) {
         }
         
         const newCache = { ...state.similarProductsCache };
-        newCache[productId] = result.data.hits || [];
+        newCache[productId] = result.data;
         updateState({ similarProductsCache: newCache });
         
-        displaySimilarProducts(result.data.hits || []);
+        displaySimilarProducts(result.data);
         
     } catch (error) {
         console.error('❌ Error loading similar products:', error);
@@ -32,24 +32,43 @@ export function displaySimilarProducts(data) {
     const section = document.getElementById('similarProductsSection');
     const container = document.getElementById('similarProductsContent');
     
-    if (!data.similar_products || data.similar_products.length === 0) {
+    // Handle different response formats
+    let similarProducts = [];
+    let referenceProduct = null;
+    
+    if (Array.isArray(data)) {
+        // If data is directly an array (from cache or simple response)
+        similarProducts = data;
+    } else if (data && data.similar_products) {
+        // If data has similar_products property
+        similarProducts = data.similar_products;
+        referenceProduct = data.reference_product;
+    } else if (data && Array.isArray(data.hits)) {
+        // If data has hits array (like search results)
+        similarProducts = data.hits;
+    }
+    
+    if (!similarProducts || similarProducts.length === 0) {
         section.style.display = 'none';
         return;
     }
     
+    const referenceHtml = referenceProduct ? 
+        `<div class="mb-2">
+            <strong>Reference Product:</strong> ${referenceProduct.material}
+        </div>` : '';
+    
     container.innerHTML = `
-        <div class="mb-2">
-            <strong>Reference Product:</strong> ${data.reference_product.material}
-        </div>
+        ${referenceHtml}
         <div class="row">
-            ${data.similar_products.map(product => `
+            ${similarProducts.slice(0, 3).map(product => `
                 <div class="col-md-4">
                     <div class="similar-product" onclick="searchForProduct('${product.id}')">
-                        <div class="similar-product-title">${product.material}</div>
+                        <div class="similar-product-title">${product.material || product.title || 'Unknown Product'}</div>
                         <div class="similar-product-details">
-                            MPN: ${product.mpn}<br>
+                            MPN: ${product.mpn || 'N/A'}<br>
                             Size: ${product.size || 'N/A'}<br>
-                            Group: ${product.group}
+                            Group: ${product.group || 'N/A'}
                         </div>
                     </div>
                 </div>
